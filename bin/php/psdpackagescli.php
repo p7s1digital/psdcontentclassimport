@@ -161,7 +161,7 @@ class psdPackagesCLI
             $server .= ':'.$port;
         }
 
-        $conn = mysql_connect($server, $user, $pwd);
+        $conn = mysqli_connect($server, $user, $pwd);
 
         if (!$conn) {
             return false;
