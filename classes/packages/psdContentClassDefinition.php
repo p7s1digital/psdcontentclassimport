@@ -72,7 +72,11 @@ class psdContentClassDefinition
      * Applies some transformations to the XML with the goal to make the code a bit easier to edit.
      *
      * Requires a preceding call of load() in order to operate on something.
-     * The transformations are: converting all serialized fields to JSON, setting a new modified-date.
+     * The transformations are:
+     * - converting all serialized fields to JSON
+     * - setting a new create- and modified-date
+     * - normalize the attribute-placement
+     * - add attribute comments.
      *
      * @return void
      */
@@ -81,21 +85,11 @@ class psdContentClassDefinition
 
         $dom = $this->openXMLFile($this->fileName);
 
-        $xPath = new DOMXPath($dom);
-        // Select all nodes with names that start with "serialized-".
-        $elements = $xPath->query('//*[starts-with(name(), "serialized-")]');
-
-        $this->logLine('Transforming '.$elements->length.' elements in '.$this->fileName, __METHOD__);
-
-        foreach ($elements as $element) {
-            if (!empty($element->textContent)) {
-                $val                = $this->reSerializeString($element->textContent);
-                $element->nodeValue = htmlentities($val, ENT_NOQUOTES, 'UTF-8');
-            }
-        }
-
+        $this->updateSerializedFields($dom);
         $this->updateCreatedFromDOM($dom);
         $this->updateModifiedFromDOM($dom);
+        $this->normalizePlacement($dom);
+        $this->addAttributeInfoComments($dom);
 
         $dom->save($this->fileName);
 
@@ -132,6 +126,36 @@ class psdContentClassDefinition
 
 
     /**
+     * Transforms searialized Fields from PHP-Serialize to JSON. Recodes entities.
+     *
+     * @param DOMDocument $dom DOM to transform.
+     *
+     * @return void
+     */
+    public function updateSerializedFields(DOMDocument $dom)
+    {
+
+        $xPath = new DOMXPath($dom);
+        // Select all nodes with names that start with "serialized-".
+        $elements = $xPath->query('//*[starts-with(name(), "serialized-")]');
+
+        if (!($elements instanceof DOMNodeList)) {
+            return;
+        }
+
+        $this->logLine('Transforming '.$elements->length.' elements in '.$this->fileName, __METHOD__);
+
+        foreach ($elements as $element) {
+            if (!empty($element->textContent)) {
+                $val                = $this->reSerializeString($element->textContent);
+                $element->nodeValue = htmlentities($val, ENT_NOQUOTES, 'UTF-8');
+            }
+        }
+
+    }
+
+
+    /**
      * Updates the modified-field of a given DOM-Structure. Requires the DOM to be a Content-Class Definition.
      *
      * @param DOMDocument $dom       The DOM Document.
@@ -145,16 +169,16 @@ class psdContentClassDefinition
         $xPath = new DOMXPath($dom);
         $nodes = $xPath->query(psdPackage::XPATH_MODIFIED);
 
+        if (!($nodes instanceof DOMNodeList) || $nodes->length < 1) {
+            return;
+        }
+
         if (empty($timeStamp)) {
             $timeStamp = time();
         }
 
-        $this->logLine('New timestamp for modified-date: '.$timeStamp.'.', __METHOD__);
-
-        if ($nodes->length > 0) {
-            $nodes->item(0)->nodeValue = $timeStamp;
-            $this->logLine(sprintf('New Modified timestamp: %s', $timeStamp), __METHOD__);
-        }
+        $nodes->item(0)->nodeValue = $timeStamp;
+        $this->logLine(sprintf('New "Modified" timestamp: %s', $timeStamp), __METHOD__);
 
     }
 
@@ -174,6 +198,8 @@ class psdContentClassDefinition
         $this->logLine('Update modified-date for '.$this->fileName, __METHOD__);
 
         $this->updateModifiedFromDOM($dom, $timeStamp);
+        $this->normalizePlacement($dom);
+        $this->addAttributeInfoComments($dom);
 
         $dom->save($this->fileName);
 
@@ -194,16 +220,16 @@ class psdContentClassDefinition
         $xPath = new DOMXPath($dom);
         $nodes = $xPath->query(psdPackage::XPATH_MODIFIED);
 
+        if (!($nodes instanceof DOMNodeList) || $nodes->length < 1) {
+            return;
+        }
+
         if (empty($timeStamp)) {
             $timeStamp = time();
         }
 
-        $this->logLine('New timestamp for created-date: '.$timeStamp.'.', __METHOD__);
-
-        if ($nodes->length > 0) {
-            $nodes->item(0)->nodeValue = $timeStamp;
-            $this->logLine(sprintf('New Created timestamp: %d', $timeStamp), __METHOD__);
-        }
+        $nodes->item(0)->nodeValue = $timeStamp;
+        $this->logLine(sprintf('New "Created" timestamp: %d', $timeStamp), __METHOD__);
 
     }
 
@@ -225,6 +251,110 @@ class psdContentClassDefinition
         $this->updateCreatedFromDOM($dom, $timeStamp);
 
         $dom->save($this->fileName);
+
+    }
+
+
+    /**
+     * Loops through all placement-tags and undates the numbering to an linear sequence.
+     *
+     * @param DOMDocument $dom The DOM Document.
+     *
+     * @return void.
+     */
+    public function normalizePlacement(DOMDocument $dom)
+    {
+
+        $xPath     = new DOMXPath($dom);
+        $namespace = $dom->lookupNamespaceUri('ezcontentclass-attri');
+
+        $xPath->registerNamespace('ezcontentclass-attri', $namespace);
+
+        $nodes = $xPath->query(psdPackage::XPATH_PLACEMENT);
+
+        if (!($nodes instanceof DOMNodeList) || $nodes->length < 1) {
+            return;
+        }
+
+        $this->logLine('Update placement for: '.$nodes->length.' nodes.', __METHOD__);
+
+        for ($i = 0, $j = $nodes->length; $i < $j; $i++) {
+            $nodes->item($i)->nodeValue = $i + 1;
+        }
+
+    }
+
+
+    /**
+     * Inserts comments containing the attribute-identifier before each attribute-node.
+     * This is done in order to find attributes more easily.
+     *
+     * @param DOMDocument $dom Dom to transform.
+     *
+     * @return void
+     */
+    public function addAttributeInfoComments(DOMDocument $dom)
+    {
+
+        $xPath     = new DOMXPath($dom);
+        $namespace = $dom->lookupNamespaceUri('ezcontentclass-attri');
+
+        $xPath->registerNamespace('ezcontentclass-attri', $namespace);
+
+        $nodes = $xPath->query(psdPackage::XPATH_ATTRIBUTES);
+
+        if (!($nodes instanceof DOMNodeList) || $nodes->length < 1) {
+            return;
+        }
+
+
+        // Loop the ezcontentclass-attri:attributes nodes.
+        for ($i = 0, $il = $nodes->length; $i < $il; $i++) {
+
+            $attributes = $nodes->item($i);
+
+            if (!($attributes instanceof DOMNode) || $attributes->childNodes->length < 1) {
+                continue;
+            }
+
+            $children = array();
+
+            // Cache the attributes in order to prevent the loop from being modified.
+            for ($j = 0, $jl = $attributes->childNodes->length; $j < $jl; $j++) {
+
+                $child = $attributes->childNodes->item($j);
+
+                if ($child instanceof DOMNode && $child->nodeName == 'attribute') {
+                    $children[] = $child;
+                }
+
+            }
+
+            // Loop the attribute-nodes.
+            foreach ($children as $child) {
+
+                // If the current attribute-node is preceded by a comment, remove it first.
+                if ($child->previousSibling instanceof DOMComment) {
+                    $attributes->removeChild($child->previousSibling);
+                }
+
+                // Get the identifier.
+                $identifier = $xPath->query('identifier', $child);
+
+                if (!($identifier instanceof DOMNodeList) || $identifier->length < 1) {
+                    continue;
+                }
+
+                $commentValue = sprintf(' %s ', $identifier->item(0)->nodeValue);
+
+                $comment = new DOMComment($commentValue);
+
+                // Add the generated comment before the attribute.
+                $attributes->insertBefore($comment, $child);
+
+            }//end foreach
+
+        }//end for
 
     }
 

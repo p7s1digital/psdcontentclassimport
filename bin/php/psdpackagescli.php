@@ -1,4 +1,3 @@
-#!/usr/bin/php
 <?php
 
 // Get eZ!
@@ -20,8 +19,8 @@ class psdPackagesCLI
      */
     public $scriptSettings = array(
         'description'    => 'Provides a CLI for text-based content-class installation.',
-        'use-session'    => false,
-        'use-modules'    => false,
+        'use-session'    => true,
+        'use-modules'    => true,
         'use-extensions' => true,
     );
 
@@ -161,7 +160,7 @@ class psdPackagesCLI
             $server .= ':'.$port;
         }
 
-        $conn = mysql_connect($server, $user, $pwd);
+        $conn = mysqli_connect($server, $user, $pwd);
 
         if (!$conn) {
             return false;
@@ -173,7 +172,7 @@ class psdPackagesCLI
             return false;
         }
 
-        mysql_select_db($db, $conn);
+        mysqli_select_db($conn, $db);
 
         $val = $this->mysqlQueryFetch(sprintf('SHOW TABLES WHERE Tables_in_%s=\'%s\';', $db, $table), $conn);
 
@@ -197,13 +196,13 @@ class psdPackagesCLI
     protected function mysqlQueryFetch($query, $conn)
     {
 
-        $res = mysql_query($query, $conn);
+        $res = mysqli_query($conn, $query);
 
         if (empty($res)) {
             return false;
         }
 
-        $val = mysql_fetch_array($res);
+        $val = mysqli_fetch_array($res);
 
         return $val;
 
@@ -529,8 +528,7 @@ class psdPackagesCLI
 
             Change the class-identifier of an existing object:
 
-                php bin/psdpackgescli.php --change-object 1234 --identifier frontpage --site-access dev.project.de
-';
+                php bin/psdpackgescli.php --change-object 1234 --identifier frontpage --site-access dev.project.de';
 
             $this->cli->output($lines, true);
 
@@ -596,6 +594,5 @@ if (count($_SERVER['argv']) > 0) {
 
     $inst = new psdPackagesCLI();
     $inst->main();
-    $inst->shutdownScript();
 
 }

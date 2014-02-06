@@ -15,8 +15,10 @@ class psdPackage extends eZPackage
     /**
      * XPATH-Constants.
      */
-    const XPATH_MODIFIED   = "/content-class/remote/modified";
-    const XPATH_IDENTIFIER = "/content-class/identifier";
+    const XPATH_MODIFIED   = '/content-class/remote/modified';
+    const XPATH_IDENTIFIER = '/content-class/identifier';
+    const XPATH_ATTRIBUTES = '/content-class/ezcontentclass-attri:attributes';
+    const XPATH_PLACEMENT  = '/content-class/ezcontentclass-attri:attributes/attribute/placement';
 
     /**
      * Set this to true before installing packages. If true, only newer content-classes are installed (by comparing the
