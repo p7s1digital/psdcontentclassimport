@@ -17,6 +17,13 @@ class psdContentClassPackage
     protected $packageName = '';
 
     /**
+     * Internal filename for accessing the package.xml.
+     *
+     * @var string
+     */
+    protected $packageFile = '';
+
+    /**
      * Path to the repository, which holds folders with package and class-definitions.
      *
      * @var string
@@ -64,6 +71,16 @@ class psdContentClassPackage
 
         $this->repoPath    = $repository;
         $this->packageName = $packageName;
+        $this->packageFile = realpath(
+            implode(
+                '/',
+                array(
+                    $this->repoPath,
+                    $this->packageName,
+                    eZPackage::definitionFilename()
+                )
+            )
+        );
 
     }
 
@@ -117,8 +134,7 @@ class psdContentClassPackage
 
         $parts = pathinfo($path);
 
-        $this->packageName = $parts['basename'];
-        $this->repoPath    = $parts['dirname'];
+        $this->load($parts['dirname'], $parts['basename']);
 
         return true;
 
@@ -667,6 +683,57 @@ class psdContentClassPackage
         \eZContentObject::clearCache();
 
         return true;
+
+    }
+
+
+    /**
+     * Returns if the currently loaded Package needs to be updated, by checking the modified-date.
+     *
+     * @return bool If the package-version is newer than the currently installed.
+     * @throws Exception if package-file does not exists.
+     */
+    public function packageNeedsUpdate()
+    {
+
+         if (!file_exists($this->packageFile)) {
+            throw new Exception('Package-File '.$this->packageFile.' does not exists.');
+        };
+
+        $package     = $this->getPackageFromFile($this->packageName, $this->repoPath);
+        $dom         = $package->fetchDOMFromFile($this->packageFile);
+        $installNode = $dom->getElementsByTagName('install')->item(0);
+
+        foreach ($installNode->childNodes as $child) {
+
+            // Build the filepath for content-class definition.
+            $filename = implode(
+                '/',
+                array(
+                    $this->repoPath,
+                    $this->packageName,
+                    $child->getAttribute('sub-directory'),
+                    $child->getAttribute('filename'),
+                )
+            );
+
+            $filename = realpath($filename.'.xml');
+
+            if (!file_exists($filename)) {
+                continue;
+            }
+
+            $fileDom = $package->fetchDOMFromFile($filename);
+
+            // Break on the first occurrence of an outdated class.
+            if (!$package->isRecentVersionInstalled($fileDom)) {
+                return true;
+            }
+
+        }
+
+        // All up to date.
+        return false;
 
     }
 

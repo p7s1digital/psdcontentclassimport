@@ -86,6 +86,7 @@ class psdPackagesCLI
                 array(
                     'extract:',
                     'update-modified:',
+                    'update-status:',
                     'install:',
                     'uninstall:',
                     'site-access:',
@@ -108,6 +109,7 @@ class psdPackagesCLI
             array($this, 'doUninstall'),
             array($this, 'doChangeObject'),
             array($this, 'doChangeNode'),
+            array($this, 'doUpdateStatus'),
         );
 
 
@@ -464,6 +466,49 @@ class psdPackagesCLI
 
 
     /**
+     * Outputs the packages that need to be updated. If there are packages that need to be updated, the count and the
+     * packages names are output. If all packages are up to date, the string "Packages are up to date." is output.
+     *
+     * @return boolean
+     */
+    public function doUpdateStatus()
+    {
+
+        // Support multiple files using wildcards.
+        $files = glob($this->arguments['update-status']);
+
+        $needsUpdate = array();
+
+        foreach ($files as $file) {
+            $pkg = new psdContentClassPackage($this->verbose);
+
+            if (!$pkg->loadFromPath($file)) {
+                continue;
+            }
+
+            if ($pkg->packageNeedsUpdate()) {
+                $needsUpdate[] = $pkg->getPackageName();
+            }
+
+        }//end foreach
+
+        if (empty($needsUpdate)) {
+            $this->cli->output('Packages are up to date.', true);
+        } else {
+            $this->cli->output('Packages modified: '.count($needsUpdate), true);
+
+            foreach ($needsUpdate as $name) {
+                $this->cli->output($name, true);
+            }
+
+        }
+
+        return true;
+
+    }
+
+
+    /**
      * Output's the script's help-text.
      *
      * @return void
@@ -501,6 +546,8 @@ class psdPackagesCLI
                                      content-classes, defined in the package.xml-structure.
                                      Keep in mind: only content-classes that don\'t have objects, will be removed.
                                      Requires the --site-access option set.
+            --update-status   PATH   Outputs the names of packages that need to be updated.
+                                     Requires a path or wildcard-pattern of package-folder(s).
             --verbose                Keeps the script telling about what it\'s doing.
 
             DEFINITIONS:
@@ -525,6 +572,10 @@ class psdPackagesCLI
             Install all updated packages (skipping unchanged ones):
 
                 php bin/psdpackgescli.php --install "path/to/repository/*" --site-access dev.project.de
+
+            Find out if packages need to be updated:
+
+                php bin/psdpackgescli.php --update-status "path/to/repository/*" --site-access dev.project.de
 
             Change the class-identifier of an existing object:
 
