@@ -19,8 +19,8 @@ class psdPackagesCLI
      */
     public $scriptSettings = array(
         'description'    => 'Provides a CLI for text-based content-class installation.',
-        'use-session'    => true,
-        'use-modules'    => true,
+        'use-session'    => false,
+        'use-modules'    => false,
         'use-extensions' => true,
     );
 
