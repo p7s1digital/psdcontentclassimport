@@ -17,6 +17,13 @@ class psdContentClassPackage
     protected $packageName = '';
 
     /**
+     * Internal filename for accessing the package.xml.
+     *
+     * @var string
+     */
+    protected $packageFile = '';
+
+    /**
      * Path to the repository, which holds folders with package and class-definitions.
      *
      * @var string
@@ -64,6 +71,16 @@ class psdContentClassPackage
 
         $this->repoPath    = $repository;
         $this->packageName = $packageName;
+        $this->packageFile = realpath(
+            implode(
+                '/',
+                array(
+                    $this->repoPath,
+                    $this->packageName,
+                    eZPackage::definitionFilename()
+                )
+            )
+        );
 
     }
 
@@ -117,8 +134,7 @@ class psdContentClassPackage
 
         $parts = pathinfo($path);
 
-        $this->packageName = $parts['basename'];
-        $this->repoPath    = $parts['dirname'];
+        $this->load($parts['dirname'], $parts['basename']);
 
         return true;
 
@@ -500,7 +516,8 @@ class psdContentClassPackage
             $this->logLine(
                 sprintf(
                     'Changing object "%s" to be of class "%s"',
-                    $object->attribute('name'), $class->attribute('identifier')
+                    $object->attribute('name'),
+                    $class->attribute('identifier')
                 ),
                 __METHOD__
             );
@@ -508,12 +525,215 @@ class psdContentClassPackage
             $object->setAttribute('contentclass_id', $class->attribute('id'));
             $object->store();
 
+            $this->updateObjectAttributes($object, $class);
+
             eZContentCacheManager::clearContentCache($objectId);
 
             return;
         }
 
         throw new Exception(sprintf('Invalid Object-ID (%s) or Class-Identifier (%s)!', $objectId, $classIdentifier));
+
+    }
+
+
+    /**
+     * Updates the attributes of a specified content-object to be in sync with a certain content-class definition.
+     * Existing attributes are matched only by identifier. Data-type is not yet checked.
+     *
+     * @param \eZContentObject $object The content-object to be updated.
+     * @param \eZContentClass  $class  The content-class for providing the attribute-definition.
+     *
+     * @return void
+     */
+    public function updateObjectAttributes(eZContentObject $object, eZContentClass $class)
+    {
+
+        $classAttributes  = $class->fetchAttributes();
+        $objectAttributes = $object->contentObjectAttributes();
+        $removeAttributes = array();
+
+        $db = \eZDB::instance();
+        $db->begin();
+
+        // Remove obsolete attributes.
+        foreach ($objectAttributes as $attr) {
+            if (!$this->listHasAttribute($classAttributes, $attr->attribute('contentclass_attribute_identifier'))) {
+                $removeAttributes[] = $attr;
+            }
+        }
+
+        foreach ($classAttributes as $index => $classAttribute) {
+
+            $id = $classAttribute->attribute('identifier');
+
+            if ($this->listHasAttribute($objectAttributes, $id)) {
+                $this->logLine(
+                    sprintf("Skipping existing attribute \"%s\" (%d of %d)", $id, $index, count($classAttributes))
+                );
+                continue;
+            }
+
+            $this->logLine(sprintf("Updating attribute \"%s\" (%d of %d)", $id, $index, count($classAttributes)));
+            if (!$this->initializeObjectAttributes($classAttribute, $object)) {
+                $this->logLine(
+                    sprintf("FAILED! Updating attribute \"%s\" (%d of %d)", $id, $index, count($classAttributes))
+                );
+            }
+
+        }
+
+        // Remove obsolete attributes.
+        foreach ($removeAttributes as $attr) {
+            $this->logLine(
+                sprintf("Removing attribute \"%s\"", $attr->attribute('contentclass_attribute_identifier'))
+            );
+            $attr->remove($attr->attribute('id'));
+        }
+
+        $db->commit();
+
+    }
+
+
+    /**
+     * Checks if a list of Attributes has an attribute with a specified identifier. Works with
+     * eZContentClassAttribute and eZContentObjectAttribute
+     *
+     * @param array[] $list       List of eZContentClassAttribute or eZContentObjectAttribute.
+     * @param string  $identifier Identifier to check.
+     *
+     * @return bool               Indicates if the attribute is found in the list.
+     */
+    protected function listHasAttribute($list, $identifier)
+    {
+
+        foreach ($list as $item) {
+
+            if (!($item instanceof \eZPersistentObject)) {
+                continue;
+            }
+
+            if ($item->attribute('identifier') == $identifier) {
+                return true;
+            }
+
+            if ($item->attribute('contentclass_attribute_identifier') == $identifier) {
+                return true;
+            }
+
+        }
+
+        return false;
+
+    }
+
+
+    /**
+     * Initializes a specific attribute for a list of objects.
+     *
+     * @param \eZContentClassAttribute $attribute   The attribute to initialize.
+     * @param \eZContentObject         $object      The objects or object to modify.
+     * @param boolean                  $allVersions Indicates if all or just the latest versions are modified.
+     *
+     * @return boolean
+     */
+    public function initializeObjectAttributes($attribute, $object, $allVersions = false)
+    {
+        if (!($object instanceof eZContentObject)
+            || !($attribute instanceof eZContentClassAttribute)
+        ) {
+            return false;
+        }
+
+        $classAttributeID = $attribute->ID;
+        $contentobjectID  = $object->attribute('id');
+        $objectVersions   = $object->versions();
+
+        if (!$allVersions) {
+            $objectVersions = array(array_pop($objectVersions));
+        }
+
+        // The start version ID, to make sure one attribute in different version has same id.
+        $startAttributeID = array();
+        foreach ($objectVersions as $objectVersion) {
+            $translations = $objectVersion->translations(false);
+            $version      = $objectVersion->attribute('version');
+            foreach ($translations as $translation) {
+                $objectAttribute = \eZContentObjectAttribute::create(
+                    $classAttributeID,
+                    $contentobjectID,
+                    $version,
+                    $translation
+                );
+
+                if (array_key_exists($translation, $startAttributeID)) {
+                    $objectAttribute->setAttribute('id', $startAttributeID[$translation]);
+                }
+                $objectAttribute->setAttribute('language_code', $translation);
+                $objectAttribute->initialize();
+                $objectAttribute->store();
+                if (!array_key_exists($translation, $startAttributeID)) {
+                    $startAttributeID[$translation] = $objectAttribute->attribute('id');
+                }
+                $objectAttribute->postInitialize();
+            }
+        }//end foreach
+
+        \eZContentObject::clearCache();
+
+        return true;
+
+    }
+
+
+    /**
+     * Returns if the currently loaded Package needs to be updated, by checking the modified-date.
+     *
+     * @return bool If the package-version is newer than the currently installed.
+     * @throws Exception if package-file does not exists.
+     */
+    public function packageNeedsUpdate()
+    {
+
+         if (!file_exists($this->packageFile)) {
+            throw new Exception('Package-File '.$this->packageFile.' does not exists.');
+        };
+
+        $package     = $this->getPackageFromFile($this->packageName, $this->repoPath);
+        $dom         = $package->fetchDOMFromFile($this->packageFile);
+        $installNode = $dom->getElementsByTagName('install')->item(0);
+
+        foreach ($installNode->childNodes as $child) {
+
+            // Build the filepath for content-class definition.
+            $filename = implode(
+                '/',
+                array(
+                    $this->repoPath,
+                    $this->packageName,
+                    $child->getAttribute('sub-directory'),
+                    $child->getAttribute('filename'),
+                )
+            );
+
+            $filename = realpath($filename.'.xml');
+
+            if (!file_exists($filename)) {
+                continue;
+            }
+
+            $fileDom = $package->fetchDOMFromFile($filename);
+
+            // Break on the first occurrence of an outdated class.
+            if (!$package->isRecentVersionInstalled($fileDom)) {
+                return true;
+            }
+
+        }
+
+        // All up to date.
+        return false;
 
     }
 

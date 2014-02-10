@@ -234,7 +234,7 @@ class psdContentClassPackageHandler extends eZPackageHandler
                 {
                     $classDefintion['always_available'] = ( $content->getAttribute( 'always-available' ) === 'true' ? 1 : 0 );
                 }
-                    
+
                 // Merge the existing class attributes with new ones.
                 if( $this->mergeExistingClass( $class, $classDefintion ) == false )
                 {
@@ -462,6 +462,17 @@ class psdContentClassPackageHandler extends eZPackageHandler
         {
             $class->setAttribute( $key, $value );
         }
+
+        if (isset($values['serialized_name_list'])) {
+            $class->NameList = new eZContentClassNameList();
+            $class->NameList->initFromSerializedList($values['serialized_name_list']);
+        }
+
+        if (isset($values['serialized_description_list'])) {
+            $class->DescriptionList = new eZContentClassNameList();
+            $class->DescriptionList->initFromSerializedList($values['serialized_description_list']);
+        }
+
         $class->store();
         eZDebug::writeNotice( 'Class ' . $class->attribute( 'identifier' ) . ' updated.' );
         return true;
@@ -486,7 +497,7 @@ class psdContentClassPackageHandler extends eZPackageHandler
     {
         // Merged attribute container.
         $syncAttributesIdentifierList = array();
-        
+
         // Loop through the XML-Nodes.
         $classAttributeList = $classAttributesNode->getElementsByTagName( 'attribute' );
         foreach ( $classAttributeList as $classAttributeNode )
