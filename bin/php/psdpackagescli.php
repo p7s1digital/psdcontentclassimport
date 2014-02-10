@@ -89,7 +89,7 @@ class psdPackagesCLI
                     'update-status:',
                     'install:',
                     'uninstall:',
-                    'site-access:',
+                    'siteaccess:',
                     'change-object:',
                     'change-node:',
                     'ignore-version::',
@@ -144,7 +144,7 @@ class psdPackagesCLI
 
 
     /**
-     * Checks if a specified table exists on the database. Database-settings are read from the current site-access.
+     * Checks if a specified table exists on the database. Database-settings are read from the current siteaccess.
      *
      * @param string $table Name of the table to test.
      *
@@ -213,7 +213,7 @@ class psdPackagesCLI
 
     /**
      * Init eZScript for functions the need db-access, only initializes once.
-     * This function needs the --site-access argument set, if left blank, the DefaultAccess from site.ini is used.
+     * This function needs the --siteaccess argument set, if left blank, the DefaultAccess from site.ini is used.
      *
      * @return void
      */
@@ -224,11 +224,11 @@ class psdPackagesCLI
             return;
         }
 
-        if (array_key_exists('site-access', $this->arguments)) {
-            $this->scriptSettings['site-access'] = $this->arguments['site-access'];
+        if (array_key_exists('siteaccess', $this->arguments)) {
+            $this->scriptSettings['siteaccess'] = $this->arguments['siteaccess'];
         } else {
             $ini                                 = eZINI::instance('site.ini');
-            $this->scriptSettings['site-access'] = $ini->variable('SiteSettings', 'DefaultAccess');
+            $this->scriptSettings['siteaccess'] = $ini->variable('SiteSettings', 'DefaultAccess');
         }
 
         $this->script = eZScript::instance($this->scriptSettings);
@@ -236,7 +236,7 @@ class psdPackagesCLI
         $this->script->startup();
         $this->script->initialize();
 
-        $this->logLine('Initializing. Using site-access '.$this->scriptSettings['site-access'], __METHOD__);
+        $this->logLine('Initializing. Using siteaccess '.$this->scriptSettings['siteaccess'], __METHOD__);
 
     }
 
@@ -539,13 +539,13 @@ class psdPackagesCLI
             --help                   This text.
                                      defined in the package.xml-structure. Will overwrite existing classes, unless the
                                      option --ignore-version is specified.
-            --site-access     STRING Site-Access that will be needed to perform database-actions. If left blank, the
+            --siteaccess     STRING siteaccess that will be needed to perform database-actions. If left blank, the
                                      DefaultAccess is taken from site.ini.
             --update-modified FILE   Sets the modified-date of a given class-file (not a package!) to now.
             --uninstall       PATH   Path or wildcard-pattern of package-folder(s) to uninstall. Will remove all
                                      content-classes, defined in the package.xml-structure.
                                      Keep in mind: only content-classes that don\'t have objects, will be removed.
-                                     Requires the --site-access option set.
+                                     Requires the --siteaccess option set.
             --update-status   PATH   Outputs the names of packages that need to be updated.
                                      Requires a path or wildcard-pattern of package-folder(s).
             --verbose                Keeps the script telling about what it\'s doing.
@@ -571,15 +571,15 @@ class psdPackagesCLI
 
             Install all updated packages (skipping unchanged ones):
 
-                php bin/psdpackgescli.php --install "path/to/repository/*" --site-access dev.project.de
+                php bin/psdpackgescli.php --install "path/to/repository/*" --siteaccess dev.project.de
 
             Find out if packages need to be updated:
 
-                php bin/psdpackgescli.php --update-status "path/to/repository/*" --site-access dev.project.de
+                php bin/psdpackgescli.php --update-status "path/to/repository/*" --siteaccess dev.project.de
 
             Change the class-identifier of an existing object:
 
-                php bin/psdpackgescli.php --change-object 1234 --identifier frontpage --site-access dev.project.de';
+                php bin/psdpackgescli.php --change-object 1234 --identifier frontpage --siteaccess dev.project.de';
 
             $this->cli->output($lines, true);
 
