@@ -539,7 +539,7 @@ class psdPackagesCLI
             --help                   This text.
                                      defined in the package.xml-structure. Will overwrite existing classes, unless the
                                      option --ignore-version is specified.
-            --siteaccess     STRING siteaccess that will be needed to perform database-actions. If left blank, the
+            --siteaccess     STRING  Siteaccess that will be needed to perform database-actions. If left blank, the
                                      DefaultAccess is taken from site.ini.
             --update-modified FILE   Sets the modified-date of a given class-file (not a package!) to now.
             --uninstall       PATH   Path or wildcard-pattern of package-folder(s) to uninstall. Will remove all
@@ -563,23 +563,23 @@ class psdPackagesCLI
 
             Convert all *.ezpkg packages into their folder-based counterparts:
 
-                php bin/psdpackgescli.php --extract "path/to/repository/*.ezpgk"
+                php bin/php/psdpackgescli.php --extract "path/to/repository/*.ezpgk"
 
             Update the modified-date for a content-class:
 
-                php bin/psdpackgescli.php --update-modified "path/to/repository/mypkg/ezcontentclass/class-myclass.xml"
+                php bin/php/psdpackgescli.php --update-modified "path/to/repository/mypkg/ezcontentclass/class-myclass.xml"
 
             Install all updated packages (skipping unchanged ones):
 
-                php bin/psdpackgescli.php --install "path/to/repository/*" --siteaccess dev.project.de
+                php bin/php/psdpackgescli.php --install "path/to/repository/*" --siteaccess dev.project.de
 
             Find out if packages need to be updated:
 
-                php bin/psdpackgescli.php --update-status "path/to/repository/*" --siteaccess dev.project.de
+                php bin/php/psdpackgescli.php --update-status "path/to/repository/*" --siteaccess dev.project.de
 
             Change the class-identifier of an existing object:
 
-                php bin/psdpackgescli.php --change-object 1234 --identifier frontpage --siteaccess dev.project.de';
+                php bin/php/psdpackgescli.php --change-object 1234 --identifier frontpage --siteaccess dev.project.de';
 
             $this->cli->output($lines, true);
 
