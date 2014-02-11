@@ -24,9 +24,45 @@ class psdPackage extends eZPackage
      * Set this to true before installing packages. If true, only newer content-classes are installed (by comparing the
      * modified-date against the one, currently installed).
      *
-     * @var bool
+     * @var boolean
      */
     public $checkForInstalledVersion = false;
+
+
+    /**
+     * Creates an psdPackage-Instance from a text-based package.
+     * The package's location is: $repositoryPath/$name/package.xml
+     *
+     * @param string $packagePath The path to the package folder. Must contain a package.xml.
+
+     * @throws Exception       If package is empty or no XML.
+
+     * @return bool|psdPackage The psdPackage-Instance or false on failure.
+     */
+    public static function createFromPath($packagePath)
+    {
+
+        $packageFile = realpath(implode('/', array($packagePath, eZPackage::definitionFilename())));
+
+        if (!file_exists($packageFile)) {
+            throw new Exception('Package-File '.$packageFile.' does not exists.');
+        };
+
+        $dom = self::fetchDOMFromFile($packageFile);
+
+        if ($dom === false) {
+            throw new Exception('Package-File '.$packageFile.' is empty or not XML.');
+        }
+
+        $package = new \psdPackage(array(), $packagePath);
+
+        if (!$package->parseDOMTree($dom)) {
+            throw new Exception('Package-File '.$packageFile.' does not contain parameters.');
+        }
+
+        return $package;
+
+    }
 
 
     /**

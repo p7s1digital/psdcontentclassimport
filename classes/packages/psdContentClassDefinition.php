@@ -17,6 +17,13 @@ class psdContentClassDefinition
     protected $fileName = '';
 
     /**
+     * Class Identifier from XML-File.
+     *
+     * @var string
+     */
+    protected $classIdentifier = '';
+
+    /**
      * Set true in order to output statistics.
      *
      * @var boolean
@@ -64,6 +71,21 @@ class psdContentClassDefinition
         }
 
         $this->fileName = $fileName;
+
+        $this->loadClassInfo();
+
+    }
+
+
+    /**
+     * Returns the class-identifier.
+     *
+     * @return string
+     */
+    public function getClassIdentifier()
+    {
+
+        return $this->classIdentifier;
 
     }
 
@@ -121,6 +143,25 @@ class psdContentClassDefinition
         }
 
         return $dom;
+
+    }
+
+
+    /**
+     * Reads basic information on a class from the XML-definition.
+     *
+     * @return void
+     */
+    protected function loadClassInfo()
+    {
+
+        $dom   = $this->openXMLFile($this->fileName);
+        $xPath = new DOMXPath($dom);
+        $node  = $xPath->query(psdPackage::XPATH_IDENTIFIER);
+
+        if ($node->length > 0) {
+            $this->classIdentifier = $node->item(0)->nodeValue;
+        }
 
     }
 

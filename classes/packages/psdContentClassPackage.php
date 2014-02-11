@@ -224,10 +224,8 @@ class psdContentClassPackage
 
         $this->logLine('Extracting Binary Package '.$fileName, __METHOD__);
 
-        $archiveOptions = new ezcArchiveOptions(array('readOnly' => true));
-        $archive        = ezcArchive::open('compress.zlib://'.$fileName, ezcArchive::TAR_GNU, $archiveOptions);
-
-        $archive->extract($packagePath);
+        $phar = new PharData($fileName);
+        $phar->extractTo($packagePath, null, true);
 
     }
 
@@ -372,8 +370,6 @@ class psdContentClassPackage
      * @param string $name           The package-name, is appended to the repository-path.
      * @param string $repositoryPath The path where the package-folder is stored.
      *
-     * @throws Exception             If package is empty or no XML.
-     *
      * @return bool|psdPackage       The psdPackage-Instance or false on failure.
      */
     public function getPackageFromFile($name, $repositoryPath)
@@ -381,39 +377,8 @@ class psdContentClassPackage
 
         $repositoryPath = realpath($repositoryPath);
         $packagePath    = realpath(implode('/', array($repositoryPath, $name)));
-        $packageFile    = realpath(implode('/', array($packagePath, 'package.xml')));
 
-        // Abort migration if package does not exists.
-        if (!file_exists($packagePath)) {
-            throw new Exception('Package-Path '.$packagePath.' does not exists.');
-        }
-
-        if (!file_exists($packageFile)) {
-            throw new Exception('Package-File '.$packageFile.' does not exists.');
-        };
-
-        $package = \psdPackage::fetch($name);
-
-        if ($package !== false) {
-            $package->remove();
-        }
-
-        // This basically resembles \eZPackage::fetchFromFile(), but with the addition to specify a
-        // custom repository-path.
-        $dom = \eZPackage::fetchDOMFromFile($packageFile);
-
-        if ($dom === false) {
-            throw new Exception('Package-File '.$packageFile.' is empty or not XML.');
-        }
-
-        $package = new \psdPackage(array(), $repositoryPath);
-
-        $parameters = $package->parseDOMTree($dom);
-        if (!$parameters) {
-            throw new Exception('Package-File '.$packageFile.' does not contain parameters.');
-        }
-
-        return $package;
+        return psdPackage::createFromPath($packagePath);
 
     }
 
@@ -696,7 +661,7 @@ class psdContentClassPackage
     public function packageNeedsUpdate()
     {
 
-         if (!file_exists($this->packageFile)) {
+        if (!file_exists($this->packageFile)) {
             throw new Exception('Package-File '.$this->packageFile.' does not exists.');
         };
 
@@ -730,7 +695,7 @@ class psdContentClassPackage
                 return true;
             }
 
-        }
+        }//end foreach
 
         // All up to date.
         return false;
