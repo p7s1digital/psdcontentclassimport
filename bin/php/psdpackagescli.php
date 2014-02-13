@@ -168,7 +168,7 @@ class psdPackagesCLI
 
         $conn = mysqli_connect($server, $user, $pwd);
 
-        if (!$conn) {psdezone-206-psdcontentclassimport-cleanup
+        if (!$conn) {
             return false;
         }
 
@@ -524,32 +524,20 @@ class psdPackagesCLI
             return false;
         }
 
-        $needsUpdate = array();
-        $repository  = new psdPackageRepository($this->arguments['update-status']);
-        $files       = $repository->getPackagePaths();
+        $repository = new psdPackageRepository($this->arguments['update-status']);
+        $status     = $repository->getUpdateStatus();
 
-        foreach ($files as $file) {
-            $pkg = new psdContentClassPackage($this->verbose);
-
-            if (!$pkg->loadFromPath($file)) {
-                continue;
-            }
-
-            if ($pkg->packageNeedsUpdate()) {
-                $needsUpdate[] = $pkg->getPackageName();
-            }
-
-        }//end foreach
-
-        if (empty($needsUpdate)) {
+        if (empty($status)) {
             $this->cli->output('Packages are up to date.', true);
         } else {
-            $this->cli->output('Packages modified: '.count($needsUpdate), true);
 
-            foreach ($needsUpdate as $name) {
-                $this->cli->output($name, true);
+            ksort($status);
+
+            $this->cli->output('Packages modified: '.count($status), true);
+
+            foreach ($status as $name => $state) {
+                $this->cli->output(sprintf('%s (%s)', $name, $state), true);
             }
-
         }
 
         return true;
