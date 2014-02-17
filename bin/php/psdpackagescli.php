@@ -225,10 +225,10 @@ class psdPackagesCLI
         }
 
         if (array_key_exists('siteaccess', $this->arguments)) {
-            $this->scriptSettings['siteaccess'] = $this->arguments['siteaccess'];
+            $this->scriptSettings['site-access'] = $this->arguments['siteaccess'];
         } else {
             $ini                                 = eZINI::instance('site.ini');
-            $this->scriptSettings['siteaccess'] = $ini->variable('SiteSettings', 'DefaultAccess');
+            $this->scriptSettings['site-access'] = $ini->variable('SiteSettings', 'DefaultAccess');
         }
 
         $this->script = eZScript::instance($this->scriptSettings);
@@ -236,7 +236,7 @@ class psdPackagesCLI
         $this->script->startup();
         $this->script->initialize();
 
-        $this->logLine('Initializing. Using siteaccess '.$this->scriptSettings['siteaccess'], __METHOD__);
+        $this->logLine('Initializing. Using siteaccess '.$this->scriptSettings['site-access'], __METHOD__);
 
     }
 
