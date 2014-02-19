@@ -12,6 +12,8 @@ require_once 'autoload.php';
 class psdPackagesCLI
 {
 
+    const MSG_CANT_REMOVE_CLASS = 'Cannot remove class %s.';
+
     /**
      * Properties for eZScript.
      *
@@ -89,6 +91,7 @@ class psdPackagesCLI
                     'update-status:',
                     'install:',
                     'uninstall:',
+                    'clean-up:',
                     'siteaccess:',
                     'change-object:',
                     'change-node:',
@@ -110,6 +113,7 @@ class psdPackagesCLI
             array($this, 'doChangeObject'),
             array($this, 'doChangeNode'),
             array($this, 'doUpdateStatus'),
+            array($this, 'doCleanUp'),
         );
 
 
@@ -370,6 +374,48 @@ class psdPackagesCLI
 
 
     /**
+     * Removes content-classes without an XML-definition from the CMS.
+     * Only "removable" classes are removed (@see eZContentClass->isRemovable).
+     * Arguments require key "clean-up".
+     *
+     * @return boolean
+     */
+    public function doCleanUp()
+    {
+
+        if (!array_key_exists('clean-up', $this->arguments)) {
+            return false;
+        }
+
+        $contentClasses = eZContentClass::fetchAllClasses();
+
+        $repository  = new psdPackageRepository($this->arguments['clean-up']);
+        $repoClasses = $repository->getAvailableClassIdentifiers();
+
+        foreach ($contentClasses as $class) {
+
+            $id = $class->attribute('identifier');
+            if (!in_array($id, $repoClasses)) {
+
+
+                if ($class->isRemovable()) {
+                    $this->cli->output('Removing class '.$id, true);
+                    $class->remove(true);
+
+                    continue;
+                }
+
+                $this->cli->output(sprintf(self::MSG_CANT_REMOVE_CLASS, $id), true);
+
+            }
+        }//end foreach
+
+        return true;
+
+    }
+
+
+    /**
      * Updates the modified-date for a given content-class definition.
      * Arguments require key "update-modified".
      *
@@ -474,33 +520,24 @@ class psdPackagesCLI
     public function doUpdateStatus()
     {
 
-        // Support multiple files using wildcards.
-        $files = glob($this->arguments['update-status']);
+        if (!array_key_exists('update-status', $this->arguments)) {
+            return false;
+        }
 
-        $needsUpdate = array();
+        $repository = new psdPackageRepository($this->arguments['update-status']);
+        $status     = $repository->getUpdateStatus();
 
-        foreach ($files as $file) {
-            $pkg = new psdContentClassPackage($this->verbose);
-
-            if (!$pkg->loadFromPath($file)) {
-                continue;
-            }
-
-            if ($pkg->packageNeedsUpdate()) {
-                $needsUpdate[] = $pkg->getPackageName();
-            }
-
-        }//end foreach
-
-        if (empty($needsUpdate)) {
+        if (empty($status)) {
             $this->cli->output('Packages are up to date.', true);
         } else {
-            $this->cli->output('Packages modified: '.count($needsUpdate), true);
 
-            foreach ($needsUpdate as $name) {
-                $this->cli->output($name, true);
+            ksort($status);
+
+            $this->cli->output('Packages modified: '.count($status), true);
+
+            foreach ($status as $name => $state) {
+                $this->cli->output(sprintf('%s (%s)', $name, $state), true);
             }
-
         }
 
         return true;
@@ -546,7 +583,10 @@ class psdPackagesCLI
                                      content-classes, defined in the package.xml-structure.
                                      Keep in mind: only content-classes that don\'t have objects, will be removed.
                                      Requires the --siteaccess option set.
-            --update-status   PATH   Outputs the names of packages that need to be updated.
+            --clean-up        REPO   Removes classes without existing package-definition from the CMS.
+                                     Path specifies the packages to check.
+                                     Only classes without objects will be removed.
+            --update-status   REPO   Outputs the names of packages that need to be updated.
                                      Requires a path or wildcard-pattern of package-folder(s).
             --verbose                Keeps the script telling about what it\'s doing.
 
@@ -558,6 +598,7 @@ class psdPackagesCLI
              PATH:                   Points to a folder or file and may contain wild-cards (eg. "*").
                                      Wild-cards are resolved and allow the script to process multiple files at once.
                                      In order to use wild-cards, you have to put the path in single- or double-quotes.
+             REPO:                   Path to the package-repository. Must contain any number of package-folders.
 
             EXAMPLES:
 
@@ -575,11 +616,15 @@ class psdPackagesCLI
 
             Find out if packages need to be updated:
 
-                php bin/php/psdpackgescli.php --update-status "path/to/repository/*" --siteaccess dev.project.de
+                php bin/php/psdpackgescli.php --update-status "path/to/repository" --siteaccess dev.project.de
 
             Change the class-identifier of an existing object:
 
-                php bin/php/psdpackgescli.php --change-object 1234 --identifier frontpage --siteaccess dev.project.de';
+                php bin/php/psdpackgescli.php --change-object 1234 --identifier frontpage --siteaccess dev.project.de
+
+            Removes all undefined classes from the CMS.
+
+                php bin/php/psdpackgescli.php --clean-up "path/to/repository" --siteaccess dev.project.de';
 
             $this->cli->output($lines, true);
 
