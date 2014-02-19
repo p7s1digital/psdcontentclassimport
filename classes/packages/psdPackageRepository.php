@@ -1,6 +1,6 @@
 <?php
 /**
- * Created by IntelliJ IDEA.
+ * Manages basic operations on the XML-based package-repository.
  *
  * @author Oliver Erdmann, <o.erdmann@finaldream.de>
  * @since  10.02.14
