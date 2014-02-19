@@ -468,7 +468,6 @@ class psdPackagesCLI
         }
 
         // Now remove the content class forced without checking isRemovable.
-        $contentClass = \eZContentClass::fetch($contentClass->attribute('id'));
         if (!array_key_exists('dryrun', $this->arguments)) {
             if ($contentClass instanceof \eZContentClass) {
                 $this->logLine(
