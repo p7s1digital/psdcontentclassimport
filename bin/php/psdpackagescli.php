@@ -98,6 +98,8 @@ class psdPackagesCLI
                     'ignore-version::',
                     'identifier:',
                     'verbose::',
+                    'force-remove-class:',
+                    'repository-path::',
                 )
             );
 
@@ -114,6 +116,7 @@ class psdPackagesCLI
             array($this, 'doChangeNode'),
             array($this, 'doUpdateStatus'),
             array($this, 'doCleanUp'),
+            array($this, 'doForceRemoveClass'),
         );
 
 
@@ -416,6 +419,81 @@ class psdPackagesCLI
 
 
     /**
+     * Removes content-classes without an XML-definition from the CMS.
+     * Only "removable" classes are removed (@see eZContentClass->isRemovable).
+     * Arguments require key "forced-remove-class" with value of content class identifier.
+     *
+     * @return boolean
+     *
+     * @throws \Exception
+     */
+    public function doForceRemoveClass()
+    {
+
+        if (!array_key_exists('force-remove-class', $this->arguments)) {
+            return false;
+        }
+
+        if (!array_key_exists('repository-path', $this->arguments)) {
+            return false;
+        }
+
+        // Get/check id.
+        $contentClassId = \eZContentClass::classIDByIdentifier($this->arguments['force-remove-class']);
+        if (!is_numeric($contentClassId)) {
+            throw new \Exception(
+                sprintf(
+                    'Content class id "%s" could not be retrieved!',
+                    $this->arguments['force-remove-class']
+                )
+            );
+        }
+
+        // Remove all content object instances.
+        $instances = \eZContentObject::fetchSameClassList($contentClassId);
+
+        if (count($instances) > 0) {
+            if (!array_key_exists('dryrun', $this->arguments)) {
+                $this->logLine(
+                    sprintf(
+                        'Found %d instances of "%s". Removing...',
+                        count($instances),
+                        $this->arguments['force-remove-class']
+                    )
+                );
+                foreach ($instances as $instance) {
+                    $instance->remove();
+                }
+            }
+        }
+
+        // Now remove the content class forced without checking isRemovable.
+        $contentClass = \eZContentClass::fetch($contentClassId);
+        if (!array_key_exists('dryrun', $this->arguments)) {
+            if ($contentClass instanceof \eZContentClass) {
+                $this->logLine(
+                    sprintf(
+                        'Removing content class definition "%s".',
+                        $this->arguments['force-remove-class']
+                    )
+                );
+                $contentClass->remove();
+            } else {
+                $this->logLine(
+                    sprintf(
+                        'Content class "%s" does not exist (anymore).',
+                        $this->arguments['force-remove-class']
+                    )
+                );
+            }
+        }
+
+        return true;
+
+    }
+
+
+    /**
      * Updates the modified-date for a given content-class definition.
      * Arguments require key "update-modified".
      *
@@ -588,6 +666,13 @@ class psdPackagesCLI
                                      Only classes without objects will be removed.
             --update-status   REPO   Outputs the names of packages that need to be updated.
                                      Requires a path or wildcard-pattern of package-folder(s).
+            --force-remove-class
+                              STRING
+                                     Explicitly removes a single content class including all of its instances. Use
+                                     this with care because it will result in losing (a lot of) data.
+                                     Requires the option --repository-path
+            --repository-path STRING Used only in option --force-remove-class to provide the path to the class
+                                     repository.
             --verbose                Keeps the script telling about what it\'s doing.
 
             DEFINITIONS:
