@@ -439,18 +439,18 @@ class psdPackagesCLI
         }
 
         // Get/check id.
-        $contentClassId = \eZContentClass::classIDByIdentifier($this->arguments['force-remove-class']);
-        if (!is_numeric($contentClassId)) {
+        $contentClass = \eZContentClass::fetchByIdentifier($this->arguments['force-remove-class']);
+        if (!$contentClass instanceof \eZContentClass) {
             throw new \Exception(
                 sprintf(
-                    'Content class id "%s" could not be retrieved!',
+                    'Content class "%s" was not found!',
                     $this->arguments['force-remove-class']
                 )
             );
         }
 
         // Remove all content object instances.
-        $instances = \eZContentObject::fetchSameClassList($contentClassId);
+        $instances = \eZContentObject::fetchSameClassList($contentClass->attribute('id'));
 
         if (count($instances) > 0) {
             if (!array_key_exists('dryrun', $this->arguments)) {
@@ -468,7 +468,7 @@ class psdPackagesCLI
         }
 
         // Now remove the content class forced without checking isRemovable.
-        $contentClass = \eZContentClass::fetch($contentClassId);
+        $contentClass = \eZContentClass::fetch($contentClass->attribute('id'));
         if (!array_key_exists('dryrun', $this->arguments)) {
             if ($contentClass instanceof \eZContentClass) {
                 $this->logLine(
