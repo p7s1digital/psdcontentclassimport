@@ -100,6 +100,7 @@ class psdPackagesCLI
                     'verbose::',
                     'force-remove-class:',
                     'repository-path::',
+                    'keep-definiton::',
                 )
             );
 
@@ -470,6 +471,16 @@ class psdPackagesCLI
         // Now remove the content class forced without checking isRemovable.
         if (!array_key_exists('dryrun', $this->arguments)) {
             if ($contentClass instanceof \eZContentClass) {
+                if (array_key_exists('keep-definition', $this->arguments)) {
+                    $this->logLine(
+                        sprintf(
+                            'Keeping definition for "%s" because option \'--keep-definition\' was used.',
+                            $this->arguments['force-remove-class']
+                        )
+                    );
+                    return true;
+                }
+
                 $this->logLine(
                     sprintf(
                         'Removing content class definition "%s".',
@@ -670,8 +681,11 @@ class psdPackagesCLI
                                      Explicitly removes a single content class including all of its instances. Use
                                      this with care because it will result in losing (a lot of) data.
                                      Requires the option --repository-path
+                                     Optionally you can instruct the script to keep the content class definition using
+                                     the --keep-definition option.
             --repository-path STRING Used only in option --force-remove-class to provide the path to the class
                                      repository.
+            --keep-definition STRING Used only in option --force-remove-class to keep the content class definition.
             --verbose                Keeps the script telling about what it\'s doing.
 
             DEFINITIONS:
