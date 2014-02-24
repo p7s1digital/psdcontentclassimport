@@ -33,16 +33,18 @@ class psdPackage extends eZPackage
      * Creates an psdPackage-Instance from a text-based package.
      * The package's location is: $repositoryPath/$name/package.xml
      *
-     * @param string $packagePath The path to the package folder. Must contain a package.xml.
-
-     * @throws Exception       If package is empty or no XML.
-
+     * @param string $repositoryPath The path to the package folder. Must contain a package.xml.
+     * @param string $packageName    The package's name inside of the
+     *
+     * @throws Exception
      * @return bool|psdPackage The psdPackage-Instance or false on failure.
      */
-    public static function createFromPath($packagePath)
+    public static function createFromPath($repositoryPath, $packageName)
     {
 
-        $packageFile = realpath(implode('/', array($packagePath, eZPackage::definitionFilename())));
+
+        $packagePath = realpath(implode('/', array($repositoryPath, $packageName)));
+        $packageFile = implode('/', array($packagePath, eZPackage::definitionFilename()));
 
         if (!file_exists($packageFile)) {
             throw new Exception('Package-File '.$packageFile.' does not exists.');
@@ -54,8 +56,10 @@ class psdPackage extends eZPackage
             throw new Exception('Package-File '.$packageFile.' is empty or not XML.');
         }
 
-        $package = new \psdPackage(array(), $packagePath);
+        // Create Package from Repository.
+        $package = new \psdPackage(array(), $repositoryPath);
 
+        // Load Install-Parameters from DOM - or fail.
         if (!$package->parseDOMTree($dom)) {
             throw new Exception('Package-File '.$packageFile.' does not contain parameters.');
         }

@@ -325,8 +325,7 @@ class psdPackagesCLI
             $result = false;
             try {
                 $result = $pkg->install($checkVersion);
-            }
-            catch(Exception $e) {
+            } catch (Exception $e) {
                 if ($e instanceof psdPackageSkipException) {
                     $this->logLine('Skipped.', true);
                     continue;
