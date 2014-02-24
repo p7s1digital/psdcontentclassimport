@@ -289,7 +289,7 @@ class psdContentClassPackage
      */
     public function install($checkVersion = true)
     {
-        $package = $this->getPackageFromFile($this->packageName, $this->repoPath);
+        $package = psdPackage::createFromPath($this->repoPath, $this->packageName);
 
         if (!($package instanceof \eZPackage)) {
             trigger_error('Unable to load package %s from %s.', $this->packageName, $this->repoPath);
@@ -318,7 +318,8 @@ class psdContentClassPackage
     public function uninstall()
     {
 
-        $package = $this->getPackageFromFile($this->packageName, $this->repoPath);
+        $package = psdPackage::createFromPath($this->repoPath, $this->packageName);
+
         if (!($package instanceof \eZPackage)) {
             trigger_error('Unable to load package %s from %s.', $this->packageName, $this->repoPath);
             return false;
@@ -359,26 +360,6 @@ class psdContentClassPackage
         );
 
         return $result;
-
-    }
-
-
-    /**
-     * Creates an psdPackage-Instance from a text-based package.
-     * The package's location is: $repositoryPath/$name/package.xml
-     *
-     * @param string $name           The package-name, is appended to the repository-path.
-     * @param string $repositoryPath The path where the package-folder is stored.
-     *
-     * @return bool|psdPackage       The psdPackage-Instance or false on failure.
-     */
-    public function getPackageFromFile($name, $repositoryPath)
-    {
-
-        $repositoryPath = realpath($repositoryPath);
-        $packagePath    = realpath(implode('/', array($repositoryPath, $name)));
-
-        return psdPackage::createFromPath($packagePath);
 
     }
 
@@ -665,7 +646,7 @@ class psdContentClassPackage
             throw new Exception('Package-File '.$this->packageFile.' does not exists.');
         };
 
-        $package     = $this->getPackageFromFile($this->packageName, $this->repoPath);
+        $package     = psdPackage::createFromPath($this->repoPath, $this->packageName);
         $dom         = $package->fetchDOMFromFile($this->packageFile);
         $installNode = $dom->getElementsByTagName('install')->item(0);
 

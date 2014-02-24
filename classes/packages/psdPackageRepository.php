@@ -7,7 +7,6 @@
  */
 
 
-
 class psdPackageRepository
 {
 
@@ -17,13 +16,6 @@ class psdPackageRepository
      * @var string
      */
     protected $path;
-
-    /**
-     * Lists absolute paths to all packages in the repository.
-     *
-     * @var string[]
-     */
-    protected $packagePaths = array();
 
 
     /**
@@ -48,18 +40,15 @@ class psdPackageRepository
     /**
      * Retrieves all package-folders in the repository.
      *
-     * @return string[] Array of Package-folders (REPO/PACKAGE)
+     * @param boolean $fullPath Returns paths including repository, if true or only the package-name, if false.
+     *
+     * @return string[] Array of Package-folders (REPO/PACKAGE if $fullPath, or PACKAGE, if !$fullPath).
      * @throws Exception If opening the folder fails.
      */
-    public function getPackagePaths()
+    public function getPackagePaths($fullPath = true)
     {
 
-        if (!empty($this->packagePaths)) {
-            return $this->packagePaths;
-        }
-
-        $this->packagePaths = array();
-
+        $result = array();
         $handle = opendir($this->path);
 
         if (!$handle) {
@@ -75,12 +64,16 @@ class psdPackageRepository
                 continue;
             }
 
-            $this->packagePaths[] = $this->path.DIRECTORY_SEPARATOR.$entry;
+            if ($fullPath) {
+                $result[] = $this->path.DIRECTORY_SEPARATOR.$entry;
+            } else {
+                $result[] = $entry;
+            }
         }
 
         closedir($handle);
 
-        return $this->packagePaths;
+        return $result;
 
     }
 
@@ -92,12 +85,12 @@ class psdPackageRepository
      */
     public function getContentClassDefinitionFiles()
     {
-        $packages = $this->getPackagePaths();
+        $packages = $this->getPackagePaths(false);
         $result   = array();
 
         foreach ($packages as $packageFolder) {
 
-            $pkg = psdPackage::createFromPath($packageFolder);
+            $pkg = psdPackage::createFromPath($this->path, $packageFolder);
 
             // Currently content-classes only.
             $installItems = $pkg->installItemsList('ezcontentclass');
@@ -113,6 +106,7 @@ class psdPackageRepository
                 $file = implode(
                     DIRECTORY_SEPARATOR,
                     array(
+                        $this->path,
                         $packageFolder,
                         $item['sub-directory'],
                         $item['filename'].'.xml'
@@ -143,6 +137,7 @@ class psdPackageRepository
         $definitions = $this->getContentClassDefinitionFiles();
         $result      = array();
 
+        // Do this extra loop to get the class-name, because you shouldn't try guessing it from the package-name.
         foreach ($definitions as $file) {
 
             $def      = new psdContentClassDefinition($file);
