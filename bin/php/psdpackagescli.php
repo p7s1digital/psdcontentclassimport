@@ -305,7 +305,8 @@ class psdPackagesCLI
         }
 
         // Support multiple files using wildcards.
-        $files = glob($this->arguments['install']);
+        $repository = new psdPackageRepository($this->arguments['install']);
+        $files      = $repository->getPackagePaths();
 
         foreach ($files as $file) {
             $pkg = new psdContentClassPackage($this->verbose);
