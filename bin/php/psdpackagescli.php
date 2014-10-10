@@ -88,10 +88,10 @@ class psdPackagesCLI
                 array(
                     'extract:',
                     'update-modified:',
-                    'update-status:',
-                    'install:',
+                    'update-status::',
+                    'install::',
                     'uninstall:',
-                    'clean-up:',
+                    'clean-up::',
                     'siteaccess:',
                     'change-object:',
                     'change-node:',
