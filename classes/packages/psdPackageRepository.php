@@ -27,13 +27,7 @@ class psdPackageRepository
      */
     public function __construct($path)
     {
-
-        $this->path = realpath($path);
-
-        if (!file_exists($this->path) || !is_dir($this->path)) {
-            throw new Exception(sprintf('%s is not a valid directory', $this->path));
-        }
-
+        $this->getRealPath($path);
     }
 
 
@@ -201,6 +195,46 @@ class psdPackageRepository
 
     }
 
+    /**
+     * Get realpath of given path.
+     *
+     * @param string $path Path
+     *
+     * @return void
+     *
+     * @throws Exception if no valid path exist.
+     */
+    protected function getRealPath($path)
+    {
+        if (empty($path)) {
+            $path = $this->getPathFromIni();
+        }
+
+        $this->path = realpath($path);
+
+        if (!file_exists($this->path) || !is_dir($this->path)) {
+            throw new Exception(sprintf('%s is not a valid directory', $this->path));
+        }
+    }
+
+
+    /**
+     * Get path from ini.
+     *
+     * @return string Path
+     */
+    protected function getPathFromIni()
+    {
+        $path = '';
+
+        $ini = eZINI::instance('psdcontentclassimport.ini');
+
+        if ($ini->hasVariable('ContentClassImportSettings', 'PackageDirectory')) {
+            $path = $ini->variable('ContentClassImportSettings', 'PackageDirectory');
+        }
+
+        return $path;
+    }
 
 
 }
