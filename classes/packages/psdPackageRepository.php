@@ -43,6 +43,18 @@ class psdPackageRepository
     {
 
         $result = array();
+
+        if (is_file($this->path)) {
+            $pathInfo = pathinfo($this->path);
+            if ($fullPath) {
+                return array($pathInfo['dirname']);
+            } else {
+                $pathArray = explode('/', $pathInfo['dirname']);
+                return array(array_pop($pathArray));
+            }
+
+        }
+
         $handle = opendir($this->path);
 
         if (!$handle) {
@@ -212,8 +224,10 @@ class psdPackageRepository
 
         $this->path = realpath($path);
 
-        if (!file_exists($this->path) || !is_dir($this->path)) {
-            throw new Exception(sprintf('%s is not a valid directory', $this->path));
+        if (!file_exists($this->path)) {
+            if (!is_dir($this->path) && !is_file($this->path)) {
+                throw new Exception(sprintf('%s is not a valid directory or file', $this->path));
+            }
         }
     }
 
