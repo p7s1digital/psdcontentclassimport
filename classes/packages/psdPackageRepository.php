@@ -243,8 +243,8 @@ class psdPackageRepository
 
         $ini = eZINI::instance('psdcontentclassimport.ini');
 
-        if ($ini->hasVariable('ContentClassImportSettings', 'PackageDirectory')) {
-            $path = $ini->variable('ContentClassImportSettings', 'PackageDirectory');
+        if ($ini->hasVariable('ContentClassImportSettings', 'DefaultPackagePath')) {
+            $path = $ini->variable('ContentClassImportSettings', 'DefaultPackagePath');
         }
 
         return $path;
