@@ -88,10 +88,10 @@ class psdPackagesCLI
                 array(
                     'extract:',
                     'update-modified:',
-                    'update-status:',
-                    'install:',
+                    'update-status::',
+                    'install::',
                     'uninstall:',
-                    'clean-up:',
+                    'clean-up::',
                     'siteaccess:',
                     'change-object:',
                     'change-node:',
@@ -304,8 +304,8 @@ class psdPackagesCLI
             return false;
         }
 
-        // Support multiple files using wildcards.
-        $files = glob($this->arguments['install']);
+        $repository = new psdPackageRepository($this->arguments['install']);
+        $files      = $repository->getPackagePaths();
 
         foreach ($files as $file) {
             $pkg = new psdContentClassPackage($this->verbose);
