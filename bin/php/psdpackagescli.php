@@ -709,7 +709,11 @@ class psdPackagesCLI
 
             Install all updated packages (skipping unchanged ones):
 
-                php bin/php/psdpackgescli.php --install "path/to/repository/*" --siteaccess dev.project.de
+                php bin/php/psdpackgescli.php --install "path/to/repository" --siteaccess dev.project.de
+
+            Install single updated packages (skipping unchanged ones):
+
+                php bin/php/psdpackgescli.php --install "path/to/repository/[PackageName]/package.xml" --siteaccess dev.project.de
 
             Find out if packages need to be updated:
 
