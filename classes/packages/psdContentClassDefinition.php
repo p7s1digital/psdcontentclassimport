@@ -113,6 +113,7 @@ class psdContentClassDefinition
         $this->normalizePlacement($dom);
         $this->addAttributeInfoComments($dom);
 
+
         $dom->save($this->fileName);
 
     }
@@ -241,6 +242,7 @@ class psdContentClassDefinition
         $this->updateModifiedFromDOM($dom, $timeStamp);
         $this->normalizePlacement($dom);
         $this->addAttributeInfoComments($dom);
+        $this->translateNamespaces($dom);
 
         $dom->save($this->fileName);
 
@@ -321,6 +323,58 @@ class psdContentClassDefinition
 
         for ($i = 0, $j = $nodes->length; $i < $j; $i++) {
             $nodes->item($i)->nodeValue = $i + 1;
+        }
+
+    }
+
+
+    /**
+     * Loops through all placement-tags and undates the numbering to an linear sequence.
+     *
+     * @param DOMDocument $dom The DOM Document.
+     *
+     * @return void.
+     */
+    public function translateNamespaces(DOMDocument $dom)
+    {
+
+        $xPath = new DOMXPath($dom);
+        // Select all nodes with names that start with "serialized-".
+        $elements = $xPath->query('//*[starts-with(name(), "serialized-")]');
+
+        if (!($elements instanceof DOMNodeList)) {
+            return;
+        }
+
+        $this->logLine('Translate '.$elements->length.' elements in '.$this->fileName, __METHOD__);
+
+        $currentLocaleCode = eZLocale::currentLocaleCode();
+
+        /** @var eZContentLanguage[] $languageList */
+        $languageList = eZContentLanguage::fetchList();
+        $localeList   = [];
+
+        foreach ($languageList as $language) {
+            $localeList[] = $language->attribute('locale');
+        }
+
+        foreach ($elements as $element) {
+            $content = json_decode($element->textContent, true);
+
+            if (!empty($content[$currentLocaleCode])) {
+                $defaultContent = $content[$currentLocaleCode];
+            } else {
+                $defaultContent = '';
+            }
+
+            foreach ($localeList as $locale) {
+                if (empty($content[$locale])) {
+                    $content[$locale] = $defaultContent;
+                }
+            }
+            $content['always-available'] = $currentLocaleCode;
+
+            $element->nodeValue = htmlentities(json_encode($content), ENT_NOQUOTES, 'UTF-8');
         }
 
     }
