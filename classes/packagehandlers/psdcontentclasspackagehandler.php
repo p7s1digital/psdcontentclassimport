@@ -144,48 +144,72 @@ class psdContentClassPackageHandler extends eZPackageHandler
         return true;
     }
 
-    /*!
-     Creates a new contentclass as defined in the xml structure.
-    */
-    function install( $package, $installType, $parameters,
-                      $name, $os, $filename, $subdirectory,
-                      $content, &$installParameters,
-                      &$installData )
+    /**
+     * Creates or update a contentclass as defined in the xml structure.
+     *
+     * @param psdPackage    $package
+     * @param string        $installType
+     * @param array         $parameters
+     * @param string        $name
+     * @param string        $os
+     * @param string        $filename
+     * @param string        $subdirectory
+     * @param DOMElement    $content
+     * @param array         $installParameters
+     * @param array         $installData
+     *
+     * @return bool
+     */
+    function install(
+        $package,
+        $installType,
+        $parameters,
+        $name,
+        $os,
+        $filename,
+        $subdirectory,
+        $content,
+        &$installParameters,
+        &$installData
+    )
     {
-        $serializedNameListNode = $content->getElementsByTagName( 'serialized-name-list' )->item( 0 );
-        $serializedNameList = $serializedNameListNode ? $this->unserializeJSON($serializedNameListNode->textContent) : false;
-        $classNameList = new eZContentClassNameList( $serializedNameList );
-        if ( $classNameList->isEmpty() )
-        {
-            $classNameList->initFromString( $content->getElementsByTagName( 'name' )->item( 0 )->textContent ); // for backward compatibility( <= 3.8 )
+        $serializedNameListNode = $content->getElementsByTagName('serialized-name-list')->item( 0 );
+        $serializedNameList     = $serializedNameListNode ? $this->unserializeJSON($serializedNameListNode->textContent) : false;
+        $classNameList          = new eZContentClassNameList($serializedNameList);
+
+        if ($classNameList->isEmpty()) {
+            // for backward compatibility( <= 3.8 )
+            $classNameList->initFromString($content->getElementsByTagName('name')->item(0)->textContent);
         }
-        $classNameList->validate( );
+        $classNameList->validate();
 
-        $serializedDescriptionListNode = $content->getElementsByTagName( 'serialized-description-list' )->item( 0 );
-        $serializedDescriptionList = $serializedDescriptionListNode ? $this->unserializeJSON($serializedDescriptionListNode->textContent) : false;
-        $classDescriptionList = new eZSerializedObjectNameList( $serializedDescriptionList );
+        $serializedDescriptionListNode = $content->getElementsByTagName('serialized-description-list')->item(0);
+        $serializedDescriptionList     = $serializedDescriptionListNode ? $this->unserializeJSON($serializedDescriptionListNode->textContent) : false;
+        $classDescriptionList          = new eZSerializedObjectNameList($serializedDescriptionList);
 
-        $classIdentifier = $content->getElementsByTagName( 'identifier' )->item( 0 )->textContent;
-        $classRemoteID = $content->getElementsByTagName( 'remote-id' )->item( 0 )->textContent;
-        $classObjectNamePattern = $content->getElementsByTagName( 'object-name-pattern' )->item( 0 )->textContent;
-        $classURLAliasPattern = is_object( $content->getElementsByTagName( 'url-alias-pattern' )->item( 0 ) ) ?
-            $content->getElementsByTagName( 'url-alias-pattern' )->item( 0 )->textContent :
+        $classIdentifier        = $content->getElementsByTagName('identifier')->item(0)->textContent;
+        $classRemoteID          = $content->getElementsByTagName('remote-id')->item(0)->textContent;
+        $classObjectNamePattern = $content->getElementsByTagName('object-name-pattern')->item(0)->textContent;
+        $classURLAliasPattern   = is_object($content->getElementsByTagName('url-alias-pattern')->item(0)) ?
+            $content->getElementsByTagName('url-alias-pattern')->item(0)->textContent :
             null;
-        $classIsContainer = $content->getAttribute( 'is-container' );
-        if ( $classIsContainer !== false )
+        $classIsContainer = $content->getAttribute('is-container');
+
+        if ($classIsContainer !== false)
             $classIsContainer = $classIsContainer == 'true' ? 1 : 0;
 
-        $classRemoteNode = $content->getElementsByTagName( 'remote' )->item( 0 );
-        $classID = $classRemoteNode->getElementsByTagName( 'id' )->item( 0 )->textContent;
-        $classGroupsNode = $classRemoteNode->getElementsByTagName( 'groups' )->item( 0 );
-        $classCreated = $classRemoteNode->getElementsByTagName( 'created' )->item( 0 )->textContent;
-        $classModified = $classRemoteNode->getElementsByTagName( 'modified' )->item( 0 )->textContent;
-        $classCreatorNode = $classRemoteNode->getElementsByTagName( 'creator' )->item( 0 );
-        $classModifierNode = $classRemoteNode->getElementsByTagName( 'modifier' )->item( 0 );
+        /** @var DOMNode $classRemoteNode */
+        $classRemoteNode   = $content->getElementsByTagName('remote')->item(0);
+        $classID           = $classRemoteNode->getElementsByTagName('id')->item(0)->textContent;
+        $classGroupsNode   = $classRemoteNode->getElementsByTagName('groups')->item(0);
+        $classCreated      = $classRemoteNode->getElementsByTagName('created')->item(0)->textContent;
+        $classModified     = $classRemoteNode->getElementsByTagName('modified')->item(0)->textContent;
+        $classCreatorNode  = $classRemoteNode->getElementsByTagName('creator')->item(0);
+        $classModifierNode = $classRemoteNode->getElementsByTagName('modifier')->item(0);
 
-        $classAttributesNode = $content->getElementsByTagName( 'attributes' )->item( 0 );
+        $classAttributesNode = $content->getElementsByTagName('attributes')->item(0);
 
-        $dateTime = time();
+        $dateTime     = time();
         $classCreated = $dateTime;
 
         if (empty($classModified)) {
@@ -193,248 +217,281 @@ class psdContentClassPackageHandler extends eZPackageHandler
         }
 
         $userID = false;
-        if ( isset( $installParameters['user_id'] ) )
+
+        if (isset($installParameters['user_id'])) {
             $userID = $installParameters['user_id'];
-
-        $class = eZContentClass::fetchByRemoteID( $classRemoteID );
-
-        if ( $class )
-        {
-            $className = $class->name();
-            $description = ezpI18n::tr( 'kernel/package', "Class '%classname' already exists.", false,
-                                   array( '%classname' => $className ) );
-
-            $choosenAction = $this->errorChoosenAction( self::ERROR_EXISTS,
-                                                        $installParameters, $description, $this->HandlerType );
-            switch( $choosenAction )
-            {
-            case eZPackage::NON_INTERACTIVE:
-            case self::ACTION_REPLACE:
-                // Create Definition array for syncing.
-                $classDefintion = array( 'version' => 0,
-                                         'serialized_name_list' => $classNameList->serializeNames(),
-                                         'serialized_description_list' => $classDescriptionList->serializeNames(),
-                                         'identifier' => $classIdentifier,
-                                         'remote_id' => $classRemoteID,
-                                         'contentobject_name' => $classObjectNamePattern,
-                                         'url_alias_name' => $classURLAliasPattern,
-                                         'is_container' => $classIsContainer,
-                                         'created' => $classCreated,
-                                         'modified' => $classModified );
-                if ( $content->hasAttribute( 'sort-field' ) )
-                {
-                    $classDefintion['sort_field'] = eZContentObjectTreeNode::sortFieldID( $content->getAttribute( 'sort-field' ) );
-                }
-                if ( $content->hasAttribute( 'sort-order' ) )
-                {
-                    $classDefintion['sort_order'] = $content->getAttribute( 'sort-order' );
-                }
-
-                if ( $content->hasAttribute( 'always-available' ) )
-                {
-                    $classDefintion['always_available'] = ( $content->getAttribute( 'always-available' ) === 'true' ? 1 : 0 );
-                }
-
-                // Merge the existing class attributes with new ones.
-                if( $this->mergeExistingClass( $class, $classDefintion ) == false )
-                {
-                    eZDebug::writeWarning( "Unable to merge class '$className' with new attributes." );
-                    return false;
-                }
-                // Merge the existing class attributes with new ones.
-                if( $this->mergeWithExisting( $class, $classAttributesNode ) == false )
-                {
-                    eZDebug::writeWarning( "Unable to merge class '$className' with new attributes." );
-                    return false;
-                }
-
-                eZDebug::writeNotice( "Class '$className' will be merged.", __METHOD__ );
-                return true;
-
-            case self::ACTION_SKIP:
-                return true;
-
-            case self::ACTION_NEW:
-                $class->setAttribute( 'remote_id', eZRemoteIdUtility::generate( 'class' ) );
-                $class->store();
-                $classNameList->appendGroupName( " (imported)" );
-                break;
-
-            default:
-                $installParameters['error'] = array( 'error_code' => self::ERROR_EXISTS,
-                                                     'element_id' => $classRemoteID,
-                                                     'description' => $description,
-                                                     'actions' => array() );
-                if ( $class->isRemovable() )
-                {
-                    $errorMsg = ezpI18n::tr( 'kernel/package', "Replace existing class" );
-                    $objectsCount = eZContentObject::fetchSameClassListCount( $class->attribute( 'id' ) );
-                    if ( $objectsCount )
-                        $errorMsg .= ' ' . ezpI18n::tr( 'kernel/package', "(Warning! $objectsCount content object(s) and their sub-items will be removed)" );
-                    $installParameters['error']['actions'][self::ACTION_REPLACE] = $errorMsg;
-                }
-                $installParameters['error']['actions'][self::ACTION_SKIP] = ezpI18n::tr( 'kernel/package', 'Skip installing this class' );
-                $installParameters['error']['actions'][self::ACTION_NEW] = ezpI18n::tr( 'kernel/package', 'Keep existing and create a new one' );
-                return false;
-            }
         }
 
-        unset( $class );
+        $class = eZContentClass::fetchByRemoteID($classRemoteID);
+
+        if ($class) {
+            $className   = $class->name();
+            $description = ezpI18n::tr(
+                'kernel/package',
+                "Class '%classname' already exists.",
+                false,
+                ['%classname' => $className]
+            );
+
+            $chosenAction = $this->errorChoosenAction(
+                self::ERROR_EXISTS,
+                $installParameters,
+                $description,
+                $this->HandlerType
+            );
+
+            switch ($chosenAction) {
+                case eZPackage::NON_INTERACTIVE:
+                case self::ACTION_REPLACE:
+                    // Create Definition array for syncing.
+                    $classDefinition = [
+                        'version'                     => 0,
+                        'serialized_name_list'        => $classNameList->serializeNames(),
+                        'serialized_description_list' => $classDescriptionList->serializeNames(),
+                        'identifier'                  => $classIdentifier,
+                        'remote_id'                   => $classRemoteID,
+                        'contentobject_name'          => $classObjectNamePattern,
+                        'url_alias_name'              => $classURLAliasPattern,
+                        'is_container'                => $classIsContainer,
+                        'created'                     => $classCreated,
+                        'modified'                    => $classModified
+                    ];
+
+                    if ($content->hasAttribute('sort-field')) {
+                        $classDefinition['sort_field'] = eZContentObjectTreeNode::sortFieldID(
+                            $content->getAttribute('sort-field')
+                        );
+                    }
+
+                    if ($content->hasAttribute('sort-order')) {
+                        $classDefinition['sort_order'] = $content->getAttribute('sort-order');
+                    }
+
+                    if ( $content->hasAttribute('always-available')) {
+                        $classDefinition['always_available'] = ($content->getAttribute( 'always-available') === 'true' ? 1 : 0 );
+                    }
+
+                    // Merge the existing class attributes with new ones.
+                    $this->mergeWithExisting($class, $classAttributesNode);
+
+                    eZDebug::writeNotice("Class '$className' will be merged.", __METHOD__);
+                    return true;
+
+                case self::ACTION_SKIP:
+                    return true;
+
+                case self::ACTION_NEW:
+                    $class->setAttribute('remote_id', eZRemoteIdUtility::generate('class'));
+                    $class->store();
+                    $classNameList->appendGroupName(" (imported)");
+                    break;
+
+                default:
+                    $installParameters['error'] = [
+                        'error_code'  => self::ERROR_EXISTS,
+                        'element_id'  => $classRemoteID,
+                        'description' => $description,
+                        'actions'     => []
+                    ];
+
+                    if ($class->isRemovable())
+                    {
+                        $errorMsg     = ezpI18n::tr( 'kernel/package', "Replace existing class" );
+                        $objectsCount = eZContentObject::fetchSameClassListCount( $class->attribute( 'id' ) );
+                        if ($objectsCount)
+                            $errorMsg .= ' '.ezpI18n::tr(
+                                'kernel/package',
+                                "(Warning! $objectsCount content object(s) and their sub-items will be removed)"
+                            );
+                        $installParameters['error']['actions'][self::ACTION_REPLACE] = $errorMsg;
+                    }
+
+                    $installParameters['error']['actions'][self::ACTION_SKIP] = ezpI18n::tr(
+                        'kernel/package', 'Skip installing this class'
+                    );
+                    $installParameters['error']['actions'][self::ACTION_NEW] = ezpI18n::tr(
+                        'kernel/package', 'Keep existing and create a new one'
+                    );
+                    return false;
+                }
+        }
+
+        unset($class);
 
         // Try to create a unique class identifier
         $currentClassIdentifier = $classIdentifier;
-        $unique = false;
+        $unique                 = false;
 
-        while( !$unique )
-        {
-            $classList = eZContentClass::fetchByIdentifier( $currentClassIdentifier );
-            if ( $classList )
-            {
+        while (!$unique) {
+            $classList = eZContentClass::fetchByIdentifier($currentClassIdentifier);
+            if ($classList) {
                 // "increment" class identifier
-                if ( preg_match( '/^(.*)_(\d+)$/', $currentClassIdentifier, $matches ) )
+                if (preg_match( '/^(.*)_(\d+)$/', $currentClassIdentifier, $matches)) {
                     $currentClassIdentifier = $matches[1] . '_' . ( $matches[2] + 1 );
-                else
+                } else {
                     $currentClassIdentifier = $currentClassIdentifier . '_1';
-            }
-            else
+                }
+            } else {
                 $unique = true;
+            }
 
-            unset( $classList );
+            unset($classList);
         }
 
         $classIdentifier = $currentClassIdentifier;
 
-        $values = array( 'version' => 0,
-                         'serialized_name_list' => $classNameList->serializeNames(),
-                         'serialized_description_list' => $classDescriptionList->serializeNames(),
-                         'create_lang_if_not_exist' => true,
-                         'identifier' => $classIdentifier,
-                         'remote_id' => $classRemoteID,
-                         'contentobject_name' => $classObjectNamePattern,
-                         'url_alias_name' => $classURLAliasPattern,
-                         'is_container' => $classIsContainer,
-                         'created' => $classCreated,
-                         'modified' => $classModified );
+        $values = [
+            'version'                     => 0,
+            'serialized_name_list'        => $classNameList->serializeNames(),
+            'serialized_description_list' => $classDescriptionList->serializeNames(),
+            'create_lang_if_not_exist'    => true,
+            'identifier'                  => $classIdentifier,
+            'remote_id'                   => $classRemoteID,
+            'contentobject_name'          => $classObjectNamePattern,
+            'url_alias_name'              => $classURLAliasPattern,
+            'is_container'                => $classIsContainer,
+            'created'                     => $classCreated,
+            'modified'                    => $classModified
+        ];
 
-        if ( $content->hasAttribute( 'sort-field' ) )
-        {
-            $values['sort_field'] = eZContentObjectTreeNode::sortFieldID( $content->getAttribute( 'sort-field' ) );
-        }
-        else
-        {
-            eZDebug::writeNotice( 'The sort field was not specified in the content class package. ' .
-                                  'This property is exported and imported since eZ Publish 4.0.2', __METHOD__ );
-        }
-
-        if ( $content->hasAttribute( 'sort-order' ) )
-        {
-            $values['sort_order'] = $content->getAttribute( 'sort-order' );
-        }
-        else
-        {
-            eZDebug::writeNotice( 'The sort order was not specified in the content class package. ' .
-                                  'This property is exported and imported since eZ Publish 4.0.2', __METHOD__ );
+        if ($content->hasAttribute('sort-field')) {
+            $values['sort_field'] = eZContentObjectTreeNode::sortFieldID($content->getAttribute('sort-field'));
+        } else {
+            eZDebug::writeNotice(
+                'The sort field was not specified in the content class package. '.
+                'This property is exported and imported since eZ Publish 4.0.2',
+                __METHOD__
+            );
         }
 
-        if ( $content->hasAttribute( 'always-available' ) )
-        {
-            $values['always_available'] = ( $content->getAttribute( 'always-available' ) === 'true' ? 1 : 0 );
+        if ($content->hasAttribute('sort-order')) {
+            $values['sort_order'] = $content->getAttribute('sort-order');
+        } else {
+            eZDebug::writeNotice(
+                'The sort order was not specified in the content class package. '.
+                'This property is exported and imported since eZ Publish 4.0.2',
+                __METHOD__
+            );
         }
-        else
-        {
-            eZDebug::writeNotice( 'The default object availability was not specified in the content class package. ' .
-                                  'This property is exported and imported since eZ Publish 4.0.2', __METHOD__ );
+
+        if ($content->hasAttribute('always-available')) {
+            $values['always_available'] = ($content->getAttribute('always-available') === 'true' ? 1 : 0);
+        } else {
+            eZDebug::writeNotice(
+                'The default object availability was not specified in the content class package. ' .
+                'This property is exported and imported since eZ Publish 4.0.2',
+                __METHOD__
+            );
         }
 
         // create class
-        $class = eZContentClass::create( $userID,
-                                         $values );
+        $class = eZContentClass::create($userID, $values);
         $class->store();
 
-        $classID = $class->attribute( 'id' );
+        $classID = $class->attribute('id');
 
-        if ( !isset( $installData['classid_list'] ) )
-            $installData['classid_list'] = array();
-        if ( !isset( $installData['classid_map'] ) )
-            $installData['classid_map'] = array();
-        $installData['classid_list'][] = $class->attribute( 'id' );
+        if (!isset($installData['classid_list'])) {
+            $installData['classid_list'] = [];
+        }
+
+        if (!isset($installData['classid_map'])) {
+            $installData['classid_map'] = [];
+        }
+
+        $installData['classid_list'][]        = $class->attribute( 'id' );
         $installData['classid_map'][$classID] = $class->attribute( 'id' );
 
         // create class attributes
-        $classAttributeList = $classAttributesNode->getElementsByTagName( 'attribute' );
-        foreach ( $classAttributeList as $classAttributeNode )
-        {
-            $isNotSupported = strtolower( $classAttributeNode->getAttribute( 'unsupported' ) ) == 'true';
-            if ( $isNotSupported )
+        $classAttributeList = $classAttributesNode->getElementsByTagName('attribute');
+
+        foreach ($classAttributeList as $classAttributeNode) {
+            $isNotSupported = strtolower($classAttributeNode->getAttribute('unsupported')) == 'true';
+
+            if ($isNotSupported) {
                 continue;
+            }
 
-            $attributeDatatype = $classAttributeNode->getAttribute( 'datatype' );
-            $attributeIsRequired = strtolower( $classAttributeNode->getAttribute( 'required' ) ) == 'true';
-            $attributeIsSearchable = strtolower( $classAttributeNode->getAttribute( 'searchable' ) ) == 'true';
-            $attributeIsInformationCollector = strtolower( $classAttributeNode->getAttribute( 'information-collector' ) ) == 'true';
-            $attributeIsTranslatable = strtolower( $classAttributeNode->getAttribute( 'translatable' ) ) == 'true';
-            $attributeSerializedNameListNode = $classAttributeNode->getElementsByTagName( 'serialized-name-list' )->item( 0 );
+            $attributeDatatype                  = $classAttributeNode->getAttribute('datatype');
+            $attributeIsRequired                = strtolower($classAttributeNode->getAttribute('required')) == 'true';
+            $attributeIsSearchable              = strtolower($classAttributeNode->getAttribute('searchable')) == 'true';
+            $attributeIsInformationCollector    = strtolower($classAttributeNode->getAttribute('information-collector')) == 'true';
+            $attributeIsTranslatable            = strtolower($classAttributeNode->getAttribute('translatable')) == 'true';
+            $attributeSerializedNameListNode    = $classAttributeNode->getElementsByTagName( 'serialized-name-list')->item(0);
             $attributeSerializedNameListContent = $attributeSerializedNameListNode ? $this->unserializeJSON($attributeSerializedNameListNode->textContent) : false;
-            $attributeSerializedNameList = new eZSerializedObjectNameList( $attributeSerializedNameListContent );
-            if ( $attributeSerializedNameList->isEmpty() )
-                $attributeSerializedNameList->initFromString( $classAttributeNode->getElementsByTagName( 'name' )->item( 0 )->textContent ); // for backward compatibility( <= 3.8 )
-            $attributeSerializedNameList->validate( );
+            $attributeSerializedNameList        = new eZSerializedObjectNameList($attributeSerializedNameListContent);
 
-            $attributeSerializedDescriptionListNode = $classAttributeNode->getElementsByTagName( 'serialized-description-list' )->item( 0 );
+            if ($attributeSerializedNameList->isEmpty()) {
+                // for backward compatibility( <= 3.8 )
+                $attributeSerializedNameList->initFromString(
+                    $classAttributeNode->getElementsByTagName('name')->item(0)->textContent
+                );
+            }
+
+            $attributeSerializedNameList->validate();
+
+            $attributeSerializedDescriptionListNode    = $classAttributeNode->getElementsByTagName('serialized-description-list')->item(0);
             $attributeSerializedDescriptionListContent = $attributeSerializedDescriptionListNode ? $this->unserializeJSON($attributeSerializedDescriptionListNode->textContent) : false;
-            $attributeSerializedDescriptionList = new eZSerializedObjectNameList( $attributeSerializedDescriptionListContent );
+            $attributeSerializedDescriptionList        = new eZSerializedObjectNameList( $attributeSerializedDescriptionListContent );
 
-            $attributeCategoryNode = $classAttributeNode->getElementsByTagName( 'category' )->item( 0 );
-            $attributeCategory = $attributeCategoryNode ? $attributeCategoryNode->textContent : '';
+            $attributeCategoryNode = $classAttributeNode->getElementsByTagName('category')->item(0);
+            $attributeCategory     = $attributeCategoryNode ? $attributeCategoryNode->textContent : '';
 
-            $attributeSerializedDataTextNode = $classAttributeNode->getElementsByTagName( 'serialized-description-text' )->item( 0 );
+            $attributeSerializedDataTextNode    = $classAttributeNode->getElementsByTagName('serialized-description-text')->item(0);
             $attributeSerializedDataTextContent = $attributeSerializedDataTextNode ? $this->unserializeJSON($attributeSerializedDataTextNode->textContent) : false;
-            $attributeSerializedDataText = new eZSerializedObjectNameList( $attributeSerializedDataTextContent );
+            $attributeSerializedDataText        = new eZSerializedObjectNameList($attributeSerializedDataTextContent);
 
-            $attributeIdentifier = $classAttributeNode->getElementsByTagName( 'identifier' )->item( 0 )->textContent;
-            $attributePlacement = $classAttributeNode->getElementsByTagName( 'placement' )->item( 0 )->textContent;
-            $attributeDatatypeParameterNode = $classAttributeNode->getElementsByTagName( 'datatype-parameters' )->item( 0 );
+            $attributeIdentifier            = $classAttributeNode->getElementsByTagName('identifier')->item(0)->textContent;
+            $attributePlacement             = $classAttributeNode->getElementsByTagName('placement')->item(0)->textContent;
+            $attributeDatatypeParameterNode = $classAttributeNode->getElementsByTagName('datatype-parameters')->item(0);
 
-            $classAttribute = $class->fetchAttributeByIdentifier( $attributeIdentifier );
-            if ( !$classAttribute )
-            {
-                $classAttribute = eZContentClassAttribute::create( $class->attribute( 'id' ),
-                                                                   $attributeDatatype,
-                                                                   array( 'version' => 0,
-                                                                          'identifier' => $attributeIdentifier,
-                                                                          'serialized_name_list' => $attributeSerializedNameList->serializeNames(),
-                                                                          'serialized_description_list' => $attributeSerializedDescriptionList->serializeNames(),
-                                                                          'category' => $attributeCategory,
-                                                                          'serialized_data_text' => $attributeSerializedDataText->serializeNames(),
-                                                                          'is_required' => $attributeIsRequired,
-                                                                          'is_searchable' => $attributeIsSearchable,
-                                                                          'is_information_collector' => $attributeIsInformationCollector,
-                                                                          'can_translate' => $attributeIsTranslatable,
-                                                                          'placement' => $attributePlacement ) );
+            $classAttribute = $class->fetchAttributeByIdentifier($attributeIdentifier);
+
+            if (!$classAttribute) {
+                $classAttribute = eZContentClassAttribute::create(
+                    $class->attribute('id'),
+                    $attributeDatatype,
+                    [
+                        'version'                     => 0,
+                        'identifier'                  => $attributeIdentifier,
+                        'serialized_name_list'        => $attributeSerializedNameList->serializeNames(),
+                        'serialized_description_list' => $attributeSerializedDescriptionList->serializeNames(),
+                        'category'                    => $attributeCategory,
+                        'serialized_data_text'        => $attributeSerializedDataText->serializeNames(),
+                        'is_required'                 => $attributeIsRequired,
+                        'is_searchable'               => $attributeIsSearchable,
+                        'is_information_collector'    => $attributeIsInformationCollector,
+                        'can_translate'               => $attributeIsTranslatable,
+                        'placement'                   => $attributePlacement
+                    ]
+                );
 
                 $dataType = $classAttribute->dataType();
                 $classAttribute->store();
-                $dataType->unserializeContentClassAttribute( $classAttribute, $classAttributeNode, $attributeDatatypeParameterNode );
+                $dataType->unserializeContentClassAttribute(
+                    $classAttribute,
+                    $classAttributeNode,
+                    $attributeDatatypeParameterNode
+                );
                 $classAttribute->sync();
             }
         }
 
         // add class to a class group
-        $classGroupsList = $classGroupsNode->getElementsByTagName( 'group' );
-        foreach ( $classGroupsList as $classGroupNode )
-        {
-            $classGroupName = $classGroupNode->getAttribute( 'name' );
-            $classGroup = eZContentClassGroup::fetchByName( $classGroupName );
-            if ( !$classGroup )
-            {
+        $classGroupsList = $classGroupsNode->getElementsByTagName('group');
+
+        foreach ($classGroupsList as $classGroupNode) {
+            $classGroupName = $classGroupNode->getAttribute('name');
+            $classGroup     = eZContentClassGroup::fetchByName($classGroupName);
+            if (!$classGroup) {
                 $classGroup = eZContentClassGroup::create();
-                $classGroup->setAttribute( 'name', $classGroupName );
+                $classGroup->setAttribute('name', $classGroupName);
                 $classGroup->store();
             }
-            $classGroup->appendClass( $class );
+            $classGroup->appendClass($class);
         }
         return true;
     }
+
 
     function add( $packageType, $package, $cli, $parameters )
     {
@@ -493,88 +550,104 @@ class psdContentClassPackageHandler extends eZPackageHandler
      *
      * @return void
      */
-    public function mergeWithExisting( eZContentClass $class, DOMElement $classAttributesNode )
+    public function mergeWithExisting(eZContentClass $class, DOMElement $classAttributesNode)
     {
         // Merged attribute container.
-        $syncAttributesIdentifierList = array();
+        $syncAttributesIdentifierList = [];
 
         // Loop through the XML-Nodes.
+        /** @var DOMNode[] $classAttributeList */
         $classAttributeList = $classAttributesNode->getElementsByTagName( 'attribute' );
-        foreach ( $classAttributeList as $classAttributeNode )
-        {
+
+        foreach ($classAttributeList as $classAttributeNode) {
+
             // If the attribute does not support serialization and imports. Skip it.
-            $isNotSupported = strtolower( $classAttributeNode->getAttribute( 'unsupported' ) ) == 'true';
-            if ( $isNotSupported )
-            {
+            $isNotSupported = strtolower($classAttributeNode->getAttribute('unsupported')) == 'true';
+            if ($isNotSupported) {
                 continue;
             }
 
             // Get all informations about the attribute.
-            $attributeDatatype = $classAttributeNode->getAttribute( 'datatype' );
-            $attributeIsRequired = strtolower( $classAttributeNode->getAttribute( 'required' ) ) == 'true';
-            $attributeIsSearchable = strtolower( $classAttributeNode->getAttribute( 'searchable' ) ) == 'true';
-            $attributeIsInformationCollector = strtolower( $classAttributeNode->getAttribute( 'information-collector' ) ) == 'true';
-            $attributeIsTranslatable = strtolower( $classAttributeNode->getAttribute( 'translatable' ) ) == 'true';
-            $attributeSerializedNameListNode = $classAttributeNode->getElementsByTagName( 'serialized-name-list' )->item( 0 );
+            $attributeDatatype                  = $classAttributeNode->getAttribute('datatype');
+            $attributeIsRequired                = strtolower($classAttributeNode->getAttribute('required')) == 'true';
+            $attributeIsSearchable              = strtolower($classAttributeNode->getAttribute('searchable')) == 'true';
+            $attributeIsInformationCollector    = strtolower($classAttributeNode->getAttribute('information-collector')) == 'true';
+            $attributeIsTranslatable            = strtolower( $classAttributeNode->getAttribute('translatable')) == 'true';
+            $attributeSerializedNameListNode    = $classAttributeNode->getElementsByTagName('serialized-name-list')->item(0);
             $attributeSerializedNameListContent = $attributeSerializedNameListNode ? $this->unserializeJSON($attributeSerializedNameListNode->textContent) : false;
-            $attributeSerializedNameList = new eZSerializedObjectNameList( $attributeSerializedNameListContent );
-            if ( $attributeSerializedNameList->isEmpty() )
-                $attributeSerializedNameList->initFromString( $classAttributeNode->getElementsByTagName( 'name' )->item( 0 )->textContent ); // for backward compatibility( <= 3.8 )
-            $attributeSerializedNameList->validate( );
+            $attributeSerializedNameList        = new eZSerializedObjectNameList( $attributeSerializedNameListContent );
 
-            $attributeSerializedDescriptionListNode = $classAttributeNode->getElementsByTagName( 'serialized-description-list' )->item( 0 );
+            if ($attributeSerializedNameList->isEmpty()) {
+                // for backward compatibility( <= 3.8 )
+                $attributeSerializedNameList->initFromString(
+                    $classAttributeNode->getElementsByTagName('name')->item(0)->textContent
+                );
+            }
+            $attributeSerializedNameList->validate();
+
+            $attributeSerializedDescriptionListNode    = $classAttributeNode->getElementsByTagName('serialized-description-list')->item(0);
             $attributeSerializedDescriptionListContent = $attributeSerializedDescriptionListNode ? $this->unserializeJSON($attributeSerializedDescriptionListNode->textContent) : false;
-            $attributeSerializedDescriptionList = new eZSerializedObjectNameList( $attributeSerializedDescriptionListContent );
+            $attributeSerializedDescriptionList        = new eZSerializedObjectNameList($attributeSerializedDescriptionListContent);
 
-            $attributeCategoryNode = $classAttributeNode->getElementsByTagName( 'category' )->item( 0 );
-            $attributeCategory = $attributeCategoryNode ? $attributeCategoryNode->textContent : '';
+            $attributeCategoryNode = $classAttributeNode->getElementsByTagName('category')->item(0);
+            $attributeCategory     = $attributeCategoryNode ? $attributeCategoryNode->textContent : '';
 
-            $attributeSerializedDataTextNode = $classAttributeNode->getElementsByTagName( 'serialized-description-text' )->item( 0 );
+            $attributeSerializedDataTextNode    = $classAttributeNode->getElementsByTagName('serialized-description-text')->item(0);
             $attributeSerializedDataTextContent = $attributeSerializedDataTextNode ? $this->unserializeJSON($attributeSerializedDataTextNode->textContent) : false;
-            $attributeSerializedDataText = new eZSerializedObjectNameList( $attributeSerializedDataTextContent );
+            $attributeSerializedDataText        = new eZSerializedObjectNameList($attributeSerializedDataTextContent);
 
-            $attributeIdentifier = $classAttributeNode->getElementsByTagName( 'identifier' )->item( 0 )->textContent;
-            $attributePlacement = $classAttributeNode->getElementsByTagName( 'placement' )->item( 0 )->textContent;
-            $attributeDatatypeParameterNode = $classAttributeNode->getElementsByTagName( 'datatype-parameters' )->item( 0 );
+            $attributeIdentifier            = $classAttributeNode->getElementsByTagName('identifier')->item(0)->textContent;
+            $attributePlacement             = $classAttributeNode->getElementsByTagName('placement')->item(0)->textContent;
+            $attributeDatatypeParameterNode = $classAttributeNode->getElementsByTagName('datatype-parameters')->item(0);
 
             // Collect all needed Parameters in an array.
-            $attributeParameters = array( 'version' => 0,
-                                          'identifier' => $attributeIdentifier,
-                                          'serialized_name_list' => $attributeSerializedNameList->serializeNames(),
-                                          'serialized_description_list' => $attributeSerializedDescriptionList->serializeNames(),
-                                          'category' => $attributeCategory,
-                                          'serialized_data_text' => $attributeSerializedDataText->serializeNames(),
-                                          'is_required' => $attributeIsRequired,
-                                          'is_searchable' => $attributeIsSearchable,
-                                          'is_information_collector' => $attributeIsInformationCollector,
-                                          'can_translate' => $attributeIsTranslatable,
-                                          'placement' => $attributePlacement );
+            $attributeParameters = [
+                'version'                     => 0,
+                'identifier'                  => $attributeIdentifier,
+                'serialized_name_list'        => $attributeSerializedNameList->serializeNames(),
+                'serialized_description_list' => $attributeSerializedDescriptionList->serializeNames(),
+                'category'                    => $attributeCategory,
+                'serialized_data_text'        => $attributeSerializedDataText->serializeNames(),
+                'is_required'                 => $attributeIsRequired,
+                'is_searchable'               => $attributeIsSearchable,
+                'is_information_collector'    => $attributeIsInformationCollector,
+                'can_translate'               => $attributeIsTranslatable,
+                'placement'                   => $attributePlacement
+            ];
 
             // Search for the attribute in existing class.
-            $classAttribute = $class->fetchAttributeByIdentifier( $attributeIdentifier );
+            $classAttribute = $class->fetchAttributeByIdentifier($attributeIdentifier);
 
-            // Detect a change of data-type.
-            if($classAttribute instanceof eZContentClassAttribute && $classAttribute->DataTypeString !== $attributeDatatype) {
-
-
+            // Detect a change of data-type. If is changed, remove it and all existing object attribute of it.
+            if ($classAttribute instanceof eZContentClassAttribute && $classAttribute->DataTypeString !== $attributeDatatype) {
                 $oldDatatype = $classAttribute->DataTypeString;
+
+                // Remove existing object attribute
+                foreach (eZContentObjectAttribute::fetchSameClassAttributeIDList($classAttribute->attribute('id')) as $objectAttribute)
+                {
+                    /** @var eZContentObjectAttribute $objectAttribute */
+                    $objectAttribute->removeThis($objectAttribute->attribute('id'));
+                }
 
                 // Remove attribute and clear.
                 $classAttribute->removeThis();
                 $classAttribute = null;
 
-                eZDebug::writeNotice( "*Attribute $attributeIdentifier in class " . $class->attribute( 'identifier' ) . ' has changed the datatype from '.$oldDatatype.' to '.$attributeDatatype.'.', __METHOD__ );
-
+                eZDebug::writeNotice(
+                    "*Attribute $attributeIdentifier in class ".
+                    $class->attribute( 'identifier' ).
+                    ' has changed the datatype from '.
+                    $oldDatatype.' to '.
+                    $attributeDatatype.'.',
+                    __METHOD__);
             }
 
             // If the attribute was found, we override the params.
-            if( $classAttribute instanceof eZContentClassAttribute )
-            {
-                foreach( $attributeParameters as $key => $value )
-                {
+            if ($classAttribute instanceof eZContentClassAttribute) {
+                foreach($attributeParameters as $key => $value) {
 
                     // Special handling of certain default-fields, which are not covered by setAttribute.
-                    switch($key){
+                    switch($key) {
                         case 'serialized_name_list':
                             $nameList = new eZSerializedObjectNameList();
                             $nameList->initFromSerializedList($value);
@@ -603,32 +676,45 @@ class psdContentClassPackageHandler extends eZPackageHandler
                             break;
 
                         default:
-                            $classAttribute->setAttribute( $key, $value );
+                            $classAttribute->setAttribute($key, $value);
                     }
                 }
 
                 // We need to Update the datatype-parameters, in case there is a change.
                 $dataType = $classAttribute->dataType();
                 if ($dataType) {
-                    $dataType->unserializeContentClassAttribute( $classAttribute, $classAttributeNode, $attributeDatatypeParameterNode );
+                    $dataType->unserializeContentClassAttribute($classAttribute, $classAttributeNode, $attributeDatatypeParameterNode);
                 }
 
                 $classAttribute->store();
-                eZDebug::writeNotice( "*Attribute $attributeIdentifier in class " . $class->attribute( 'identifier' ) . ' was merged.', __METHOD__ );
-            }
-            // Create new class-attribute if nothing was found.
-            else
-            {
-                $classAttribute = eZContentClassAttribute::create( $class->attribute( 'id' ),  $attributeDatatype, $attributeParameters );
+                eZDebug::writeNotice(
+                    "*Attribute $attributeIdentifier in class ".$class->attribute('identifier').' was merged.',
+                    __METHOD__
+                );
+            } else { // Create new class-attribute if nothing was found.
+                $classAttribute = eZContentClassAttribute::create(
+                    $class->attribute('id'),
+                    $attributeDatatype,
+                    $attributeParameters
+                );
                 $dataType = $classAttribute->dataType();
                 $classAttribute->store();
+
                 if (!$dataType) {
                     continue;
                 }
-                $dataType->unserializeContentClassAttribute( $classAttribute, $classAttributeNode, $attributeDatatypeParameterNode );
+
+                $dataType->unserializeContentClassAttribute(
+                    $classAttribute,
+                    $classAttributeNode,
+                    $attributeDatatypeParameterNode
+                );
                 $classAttribute->sync();
                 $classAttribute->initializeObjectAttributes();
-                eZDebug::writeNotice( "+Attribute $attributeIdentifier in class " . $class->attribute( 'identifier' ) . ' created.', __METHOD__ );
+                eZDebug::writeNotice(
+                    "+Attribute $attributeIdentifier in class ".$class->attribute('identifier').' created.',
+                    __METHOD__
+                );
             }
             $syncAttributesIdentifierList[] = $attributeIdentifier;
         }
@@ -639,25 +725,32 @@ class psdContentClassPackageHandler extends eZPackageHandler
         // Get now the existing attributes in class.
         $existingClassAttributes = $class->fetchAttributes();
 
-        // Loop throug the existing attributes and check if availabled in new xml.
-        foreach( $existingClassAttributes as $classAttribute )
-        {
+        // Loop throug the existing attributes and check if available in new xml.
+        foreach ($existingClassAttributes as $classAttribute) {
             // Skip processing if error in class-definition was found.
-            if( !$classAttribute instanceof eZContentClassAttribute )
-            {
+            if (!$classAttribute instanceof eZContentClassAttribute) {
                 eZDebug::writeWarning( "Fetched attribute not instanceof eZContentClassAttribute.", __METHOD__ );
                 continue;
             }
-            // If the current attribute was not synced - remove it.
-            $attributeIdentifier = $classAttribute->attribute( 'identifier' );
-            if( !in_array( $attributeIdentifier, $syncAttributesIdentifierList ) )
-            {
-                eZDebug::writeNotice( "-Attribute $attributeIdentifier in class " . $class->attribute( 'identifier' ) . ' removed.', __METHOD__ );
+
+            // If the current attribute was not synced - remove it and all existing object attribute of it.
+            $attributeIdentifier = $classAttribute->attribute('identifier');
+            if (!in_array( $attributeIdentifier, $syncAttributesIdentifierList)) {
+                eZDebug::writeNotice(
+                    "-Attribute $attributeIdentifier in class ".$class->attribute('identifier').' removed.',
+                    __METHOD__
+                );
+
+                // Remove existing object attribute
+                foreach (eZContentObjectAttribute::fetchSameClassAttributeIDList($classAttribute->attribute('id')) as $objectAttribute) {
+                    /** @var eZContentObjectAttribute $objectAttribute */
+                    $objectAttribute->removeThis($objectAttribute->attribute('id'));
+                }
+
+                // Remove class attribute
                 $classAttribute->removeThis();
             }
         }
-
-        return true;
     }
 
     public function unserializeJSON($str) {
