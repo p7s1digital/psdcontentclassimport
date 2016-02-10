@@ -240,6 +240,7 @@ class psdContentClassDefinition
 
         $this->updateModifiedFromDOM($dom, $timeStamp);
         $this->normalizePlacement($dom);
+        $this->removeRemote($dom);
         $this->addAttributeInfoComments($dom);
 
         $dom->save($this->fileName);
@@ -321,6 +322,36 @@ class psdContentClassDefinition
 
         for ($i = 0, $j = $nodes->length; $i < $j; $i++) {
             $nodes->item($i)->nodeValue = $i + 1;
+        }
+
+    }
+
+
+    /**
+     * Loops through all remote-tags and remove them.
+     *
+     * @param DOMDocument $dom The DOM Document.
+     *
+     * @return void.
+     */
+    public function removeRemote(DOMDocument $dom)
+    {
+
+        $xPath     = new DOMXPath($dom);
+        $namespace = $dom->lookupNamespaceUri('ezcontentclass-attri');
+
+        $xPath->registerNamespace('ezcontentclass-attri', $namespace);
+
+        $nodes = $xPath->query(psdPackage::XPATH_REMOTE);
+
+        if (!($nodes instanceof DOMNodeList) || $nodes->length < 1) {
+            return;
+        }
+
+        $this->logLine('Remove remote for: '.$nodes->length.' nodes.', __METHOD__);
+
+        for ($i = 0, $j = $nodes->length; $i < $j; $i++) {
+            $nodes->item($i)->parentNode->removeChild($nodes->item($i));
         }
 
     }
