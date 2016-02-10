@@ -271,8 +271,18 @@ class psdContentClassPackageHandler extends eZPackageHandler
                         $classDefinition['always_available'] = ($content->getAttribute( 'always-available') === 'true' ? 1 : 0 );
                     }
 
+                    // Update class attribute.
+                    foreach ($classDefinition as $key => $value) {
+                        $class->setAttribute($key, $value);
+                    }
+                    $class->NameList = $classNameList;
+                    $class->store();
+
                     // Merge the existing class attributes with new ones.
                     $this->mergeWithExisting($class, $classAttributesNode);
+
+                    // add class to a class group
+                    $this->addClassToClassGroup($class, $classGroupsNode);
 
                     eZDebug::writeNotice("Class '$className' will be merged.", __METHOD__);
                     return true;
@@ -477,19 +487,58 @@ class psdContentClassPackageHandler extends eZPackageHandler
         }
 
         // add class to a class group
+        $this->addClassToClassGroup($class, $classGroupsNode);
+
+        return true;
+
+    }
+
+
+    /**
+     * Add class to class groups.
+     *
+     * @param eZContentClass    $class              Content class object.
+     * @param DOMNode           $classGroupsNode    Class group dom node.
+     */
+    function addClassToClassGroup($class, $classGroupsNode)
+    {
         $classGroupsList = $classGroupsNode->getElementsByTagName('group');
+        $inClassGroupList = [];
 
         foreach ($classGroupsList as $classGroupNode) {
+
+            // Find class group by name.
             $classGroupName = $classGroupNode->getAttribute('name');
-            $classGroup     = eZContentClassGroup::fetchByName($classGroupName);
-            if (!$classGroup) {
+            $classGroupID   = $classGroupNode->getAttribute('id');
+
+            if ($classGroup = eZContentClassGroup::fetchByName($classGroupName)) {
+                // Use it.
+            } elseif ($classGroup = eZContentClassGroup::fetch($classGroupID)) {
+                // Update name and use it.
+                $classGroup->setAttribute('name', $classGroupName);
+                $classGroup->store();
+            } else {
+                // Create it.
                 $classGroup = eZContentClassGroup::create();
+                $classGroup->setAttribute('id', $classGroupID);
                 $classGroup->setAttribute('name', $classGroupName);
                 $classGroup->store();
             }
-            $classGroup->appendClass($class);
+
+            $inClassGroupList[] = $classGroup->attribute('id');
+
+            // Append if class is not in group.
+            if (!$class->inGroup($classGroup->attribute('id'))) {
+                $classGroup->appendClass($class);
+            }
         }
-        return true;
+
+        // Remove class from deprecated class group.
+        foreach ($class->attribute('ingroup_id_list') as $groupID) {
+            if (!in_array($groupID, $inClassGroupList)) {
+                eZClassFunctions::removeGroup($class->attribute('id'), null, [$groupID]);
+            }
+        }
     }
 
 
